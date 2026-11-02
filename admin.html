@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel</title>
+<style>
+body{font-family:sans-serif;background:#f4f4f4;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.box{background:white;padding:25px;border-radius:12px;width:90%;max-width:400px;box-shadow:0 5px 15px rgba(0,0,0,0.2)}
+input,button{width:100%;padding:11px;margin:8px 0;border-radius:6px;border:1px solid #ccc}
+button{background:#ffcc00;border:none;font-weight:bold;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="box" id="b1">
+<h2>Admin Login</h2>
+<p>Default Password: 123456</p>
+<input type="password" id="p" placeholder="Password দিন">
+<button onclick="if(document.getElementById('p').value===(localStorage.getItem('ap')||'123456')){document.getElementById('b1').style.display='none';document.getElementById('b2').style.display='block'}else{alert('ভুল পাসওয়ার্ড')}">Login</button>
+</div>
+
+<div class="box" id="b2" style="display:none">
+<h2>Admin Settings</h2>
+<input type="password" id="np" placeholder="নতুন পাসওয়ার্ড লিখুন">
+<button onclick="localStorage.setItem('ap',document.getElementById('np').value);alert('নতুন পাসওয়ার্ড সেভ হয়েছে: '+document.getElementById('np').value)">নতুন পাসওয়ার্ড সেট করুন</button>
+<button onclick="if(confirm('Reset করবেন?')){localStorage.removeItem('ap');alert('Reset Done, এখন পাসওয়ার্ড 123456');location.reload()}" style="background:#ff4444;color:white;margin-top:15px">পাসওয়ার্ড রিসেট করুন</button>
+</div>
+</body>
+</html>
