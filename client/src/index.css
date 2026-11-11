@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #ffffff;
+  --bg-2: #f6f7f9;
+  --text: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --radius: 12px;
+  --font: 'Inter', 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+  --font-bn: 'Hind Siliguri', 'Inter', system-ui, sans-serif;
+}
+
+.dark {
+  --bg: #0f172a;
+  --bg-2: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --border: #334155;
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-bn {
+  font-family: var(--font-bn);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+}
+
+.app-main {
+  flex: 1;
+  padding: 20px;
+  background: var(--bg-2);
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    padding: 12px;
+  }
+}
