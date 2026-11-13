@@ -30,9 +30,9 @@ export default function Login() {
         {!role ? (
           <div>
             <b>তুমি কে? 👇</b>
-            <button style={btnStyle} onClick={() => setRole('agent')}>🤝 আমি Agent</button>
-            <button style={btnStyle} onClick={() => setRole('mistri')}>🎨 আমি মিস্ত্রি</button>
             <button style={btnStyle} onClick={() => setRole('customer')}>🏠 আমি গ্রাহক</button>
+            <button style={btnStyle} onClick={() => setRole('mistri')}>🎨 আমি মিস্ত্রি</button>
+            <button style={btnStyle} onClick={() => setRole('agent')}>🤝 আমি Agent</button>
             <p style={{ textAlign: 'center', fontSize: '12px', marginTop: '16px', color: '#64748b' }}>
               Super Admin? <a href="/super-admin">এখানে চাপ দিন</a>
             </p>
