@@ -1,1 +1,0 @@
-export default function ReportPage(){ return <h2>Reports</h2> }
