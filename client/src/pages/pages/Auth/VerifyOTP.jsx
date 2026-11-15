@@ -1,1 +1,0 @@
-export default function VerifyOTP(){ return <h2>Verify OTP</h2> }
