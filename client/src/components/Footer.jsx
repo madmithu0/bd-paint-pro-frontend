@@ -1,1 +1,0 @@
-export default function Footer({version}){ return <footer style={{padding:16, textAlign:'center'}}>BD Paint Pro v{version}</footer> }
