@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, Component } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, Component, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import useAuth from './hooks/useAuth';
 import useKill from './hooks/useKill';
 import Navbar from './components/Navbar';
@@ -52,6 +52,10 @@ const SchedulePage = lazy(() => import('./pages/SchedulePage'));
 const ContractPage = lazy(() => import('./pages/Legal/ContractPage'));
 const LegalPages = lazy(() => import('./pages/Legal/LegalPages'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+
+// Tier 3: Isolated Super Admin Lazy Imports
+const SuperVerify = lazy(() => import('./pages/Admin/SuperVerify'));
+const SuperAdminDashboard = lazy(() => import('./pages/Admin/SuperAdminDashboard'));
 
 class ComponentErrorBoundary extends Component {
   constructor(props) {
@@ -107,9 +111,53 @@ const ProtectedRoute = ({ children, featureKey }) => {
   return <ComponentErrorBoundary>{children}</ComponentErrorBoundary>;
 };
 
-export default function App() {
+const SuperAdminStealthGate = () => {
+  const [superToken, setSuperToken] = useState(() => localStorage.getItem('superAdminToken') || '');
+
+  const handleUnlockSuccess = (token) => {
+    localStorage.setItem('superAdminToken', token);
+    setSuperToken(token);
+  };
+
+  const handleSuperLogout = () => {
+    localStorage.removeItem('superAdminToken');
+    setSuperToken('');
+  };
+
+  if (!superToken) {
+    return (
+      <ComponentErrorBoundary>
+        <SuperVerify onUnlockSuccess={handleUnlockSuccess} />
+      </ComponentErrorBoundary>
+    );
+  }
+
+  return (
+    <ComponentErrorBoundary>
+      <SuperAdminDashboard superToken={superToken} onLogout={handleSuperLogout} />
+    </ComponentErrorBoundary>
+  );
+};
+
+const AppLayout = () => {
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { globalKill } = useKill();
+
+  const isStealthRoute = location.pathname.startsWith('/x9-super-2026');
+
+  if (isStealthRoute) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <Toast />
+        <Suspense fallback={<Loading fullScreen={true} />}>
+          <Routes>
+            <Route path="/x9-super-2026/*" element={<SuperAdminStealthGate />} />
+          </Routes>
+        </Suspense>
+      </div>
+    );
+  }
 
   if (globalKill) {
     return (
@@ -123,56 +171,39 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100">
-        <Toast />
-        {isAuthenticated ? <Topbar /> : <Navbar />}
-        <div className="flex flex-1">
-          {isAuthenticated && <Sidebar />}
-          <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
-            <Suspense fallback={<Loading fullScreen={false} />}>
-              <Routes>
-                <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-                <Route path="/services" element={<ComponentErrorBoundary><HomePage /></ComponentErrorBoundary>} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/verify-otp" element={<VerifyOTP />} />
-                <Route path="/legal/:type" element={<LegalPages />} />
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100">
+      <Toast />
+      {isAuthenticated ? <Topbar /> : <Navbar />}
+      <div className="flex flex-1">
+        {isAuthenticated && <Sidebar />}
+        <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
+          <Suspense fallback={<Loading fullScreen={false} />}>
+            <Routes>
+              <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+              <Route path="/services" element={<ComponentErrorBoundary><HomePage /></ComponentErrorBoundary>} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-otp" element={<VerifyOTP />} />
+              <Route path="/legal/:type" element={<LegalPages />} />
 
-                <Route path="/dashboard" element={<ProtectedRoute featureKey="dashboard"><Dashboard /></ProtectedRoute>} />
-                <Route path="/jobs/create" element={<ProtectedRoute featureKey="jobCreate"><JobCreate /></ProtectedRoute>} />
-                <Route path="/jobs" element={<ProtectedRoute featureKey="jobList"><JobList /></ProtectedRoute>} />
-                <Route path="/jobs/:id" element={<ProtectedRoute featureKey="jobDetails"><JobDetails /></ProtectedRoute>} />
-                <Route path="/jobs/:id/cancel" element={<ProtectedRoute featureKey="jobCancel"><JobCancel /></ProtectedRoute>} />
-                <Route path="/jobs/:id/otp" element={<ProtectedRoute featureKey="jobOtp"><JobOtp /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute featureKey="dashboard"><Dashboard /></ProtectedRoute>} />
+              <Route path="/jobs/create" element={<ProtectedRoute featureKey="jobCreate"><JobCreate /></ProtectedRoute>} />
+              <Route path="/jobs" element={<ProtectedRoute featureKey="jobList"><JobList /></ProtectedRoute>} />
+              <Route path="/jobs/:id" element={<ProtectedRoute featureKey="jobDetails"><JobDetails /></ProtectedRoute>} />
+              <Route path="/jobs/:id/cancel" element={<ProtectedRoute featureKey="jobCancel"><JobCancel /></ProtectedRoute>} />
+              <Route path="/jobs/:id/otp" element={<ProtectedRoute featureKey="jobOtp"><JobOtp /></ProtectedRoute>} />
 
-                <Route path="/teams/create" element={<ProtectedRoute featureKey="team"><TeamCreate /></ProtectedRoute>} />
-                <Route path="/teams" element={<ProtectedRoute featureKey="team"><TeamList /></ProtectedRoute>} />
-                <Route path="/teams/:id" element={<ProtectedRoute featureKey="team"><TeamDetails /></ProtectedRoute>} />
+              <Route path="/teams/create" element={<ProtectedRoute featureKey="team"><TeamCreate /></ProtectedRoute>} />
+              <Route path="/teams" element={<ProtectedRoute featureKey="team"><TeamList /></ProtectedRoute>} />
+              <Route path="/teams/:id" element={<ProtectedRoute featureKey="team"><TeamDetails /></ProtectedRoute>} />
 
-                <Route path="/payment/:jobId" element={<ProtectedRoute featureKey="payment"><PaymentPage /></ProtectedRoute>} />
-                <Route path="/payment/details/:id" element={<ProtectedRoute featureKey="payment"><PaymentDetails /></ProtectedRoute>} />
-                <Route path="/payment/status/:id" element={<ProtectedRoute featureKey="payment"><PaymentStatus /></ProtectedRoute>} />
-                <Route path="/payment/advance/:jobId" element={<ProtectedRoute featureKey="payment"><AdvancePayment /></ProtectedRoute>} />
-                <Route path="/payment/coupon" element={<ProtectedRoute featureKey="payment"><CouponApply /></ProtectedRoute>} />
-                <Route path="/withdraw" element={<ProtectedRoute featureKey="withdraw"><WithdrawPage /></ProtectedRoute>} />
-                <Route path="/wallet" element={<ProtectedRoute featureKey="wallet"><WalletPage /></ProtectedRoute>} />
+              <Route path="/payment/:jobId" element={<ProtectedRoute featureKey="payment"><PaymentPage /></ProtectedRoute>} />
+              <Route path="/payment/details/:id" element={<ProtectedRoute featureKey="payment"><PaymentDetails /></ProtectedRoute>} />
+              <Route path="/payment/status/:id" element={<ProtectedRoute featureKey="payment"><PaymentStatus /></ProtectedRoute>} />
+              <Route path="/payment/advance/:jobId" element={<ProtectedRoute featureKey="payment"><AdvancePayment /></ProtectedRoute>} />
+              <Route path="/payment/coupon" element={<ProtectedRoute featureKey="payment"><CouponApply /></ProtectedRoute>} />
+              <Route path="/withdraw" element={<ProtectedRoute featureKey="withdraw"><WithdrawPage /></ProtectedRoute>} />
+              <Route path="/wallet" element={<ProtectedRoute featureKey="wallet"><WalletPage /></ProtectedRoute>} />
 
-                <Route path="/chat" element={<ProtectedRoute featureKey="chat"><ChatList /></ProtectedRoute>} />
-                <Route path="/chat/:userId" element={<ProtectedRoute featureKey="chat"><ChatPage /></ProtectedRoute>} />
-
-                <Route path="/attendance" element={<ProtectedRoute featureKey="attendance"><AttendancePage /></ProtectedRoute>} />
-                <Route path="/attendance/list" element={<ProtectedRoute featureKey="attendance"><AttendanceList /></ProtectedRoute>} />
-
-                <Route path="/review/:jobId" element={<ProtectedRoute featureKey="review"><ReviewPage /></ProtectedRoute>} />
-                <Route path="/dispute/:jobId" element={<ProtectedRoute featureKey="dispute"><DisputePage /></ProtectedRoute>} />
-
-                <Route path="/materials" element={<ProtectedRoute featureKey="material"><MaterialPage /></ProtectedRoute>} />
-                <Route path="/materials/:id" element={<ProtectedRoute featureKey="material"><MaterialDetails /></ProtectedRoute>} />
-
-                <Route path="/notifications" element={<ProtectedRoute featureKey="notification"><NotificationPage /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute featureKey="profile"><ProfilePage /></ProtectedRoute>} />
-                <Route path="/profile/mistri-verify" element={<ProtectedRoute featureKey="mistriVerify"><MistriVerify /></ProtectedRoute>} />
-
-                <Route path="/search" element={<ProtectedRoute featureKey="search"><SearchPage /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute featureKey="chat"><ChatList /></ProtectedRoute>} />
