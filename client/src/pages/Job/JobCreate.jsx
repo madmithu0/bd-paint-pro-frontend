@@ -104,7 +104,6 @@ const JobCreate = () => {
       platformShare,
     };
   }, [sqft, materialSource, wallProblems, damageLevel, hasAgent]);
-
   // Handle Photo Upload & AI Wall Detection
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -223,7 +222,6 @@ const JobCreate = () => {
   };
 
   const hasAnyWallProblem = wallProblems.nona || wallProblems.damp || wallProblems.fatol;
-
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-white dark:bg-gray-900 rounded-xl shadow-md">
       <div className="flex flex-wrap justify-between items-center gap-2 border-b pb-4 mb-6 dark:border-gray-700">
@@ -281,3 +279,166 @@ const JobCreate = () => {
               value={sqft}
               onChange={(e) => setSqft(e.target.value)}
               placeholder="e.g. 450"
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Standard: 450 Sqft = 1 Day (100 Sqft = 0.22 Day)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Material Source
+            </label>
+            <select
+              value={materialSource}
+              onChange={(e) => setMaterialSource(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            >
+              <option value="platform">Platform Material + Labour</option>
+              <option value="customer">Customer Material (Mistri-Only)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Wall Problems */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+            Wall Conditions
+          </h3>
+          <div className="flex flex-wrap gap-6 mb-3">
+            <label className="flex items-center space-x-2 text-sm dark:text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wallProblems.nona}
+                onChange={(e) => setWallProblems((prev) => ({ ...prev, nona: e.target.checked }))}
+              />
+              <span>Nona</span>
+            </label>
+            <label className="flex items-center space-x-2 text-sm dark:text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wallProblems.damp}
+                onChange={(e) => setWallProblems((prev) => ({ ...prev, damp: e.target.checked }))}
+              />
+              <span>Damp</span>
+            </label>
+            <label className="flex items-center space-x-2 text-sm dark:text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wallProblems.fatol}
+                onChange={(e) => setWallProblems((prev) => ({ ...prev, fatol: e.target.checked }))}
+              />
+              <span>Fatol</span>
+            </label>
+          </div>
+
+          {hasAnyWallProblem && (
+            <div className="mt-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mr-2">
+                Damage Level:
+              </label>
+              <select
+                value={damageLevel}
+                onChange={(e) => setDamageLevel(e.target.value)}
+                className="px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Agent Reference */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg dark:border-gray-700">
+          <label className="flex items-center space-x-2 text-sm font-medium dark:text-gray-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hasAgent}
+              onChange={(e) => {
+                setHasAgent(e.target.checked);
+                if (!e.target.checked) setAgentCode('');
+              }}
+            />
+            <span>Agent Reference</span>
+          </label>
+          {hasAgent && (
+            <input
+              type="text"
+              value={agentCode}
+              onChange={(e) => setAgentCode(e.target.value)}
+              placeholder="Agent ID or Phone"
+              className="px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              required={hasAgent}
+            />
+          )}
+        </div>
+
+        {/* Auto Calculation Summary */}
+        <div className="p-5 bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-xl space-y-3">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-blue-900 dark:text-blue-300">
+              Estimation Summary
+            </h3>
+            {sqft > 0 && (
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                {formatSqft ? formatSqft(sqft) : `${sqft} Sqft`}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div className="p-2.5 bg-white dark:bg-gray-900 rounded">
+              <span className="text-gray-500 block text-xs">Duration</span>
+              <strong className="text-gray-800 dark:text-white">
+                {calculations.totalDays} Days
+              </strong>
+            </div>
+            <div className="p-2.5 bg-white dark:bg-gray-900 rounded">
+              <span className="text-gray-500 block text-xs">Mistri Needed</span>
+              <strong className="text-gray-800 dark:text-white">
+                {calculations.mistriCount}
+              </strong>
+            </div>
+            <div className="p-2.5 bg-white dark:bg-gray-900 rounded">
+              <span className="text-gray-500 block text-xs">Auto Slots</span>
+              <strong className="text-gray-800 dark:text-white">
+                {calculations.slots.length}
+              </strong>
+            </div>
+            <div className="p-2.5 bg-white dark:bg-gray-900 rounded">
+              <span className="text-gray-500 block text-xs">Total Price</span>
+              <strong className="text-green-600 text-base">
+                {formatTaka ? formatTaka(calculations.totalPrice) : `৳ ${calculations.totalPrice}`}
+              </strong>
+            </div>
+          </div>
+
+          {/* Cost & Share Breakup */}
+          <div className="pt-2 border-t border-blue-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <span>Labour: ৳{calculations.labourCost}</span>
+            <span>Material: ৳{calculations.materialCost}</span>
+            <span>Repair: ৳{calculations.repairCost}</span>
+            <span>Mistri (80%): ৳{calculations.mistriShare}</span>
+            <span>Agent ({hasAgent ? '5%' : '0%'}): ৳{calculations.agentShare}</span>
+            <span>Platform ({hasAgent ? '15%' : '20%'}): ৳{calculations.platformShare}</span>
+          </div>
+        </div>
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={loading || aiLoading}
+          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition disabled:opacity-50"
+        >
+          {loading ? 'Creating Job...' : 'Confirm & Create Job'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default JobCreate;
