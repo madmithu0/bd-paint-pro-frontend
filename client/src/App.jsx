@@ -211,3 +211,37 @@ const AppLayout = () => {
 
               {/* Payments & Wallet */}
               <Route path="/payments" element={<ProtectedRoute featureKey="payment"><PaymentPage /></ProtectedRoute>} />
+              <Route path="/payments/:id" element={<ProtectedRoute featureKey="paymentDetails"><PaymentDetails /></ProtectedRoute>} />
+              <Route path="/payment-status" element={<ProtectedRoute featureKey="paymentStatus"><PaymentStatus /></ProtectedRoute>} />
+              <Route path="/withdraw" element={<ProtectedRoute featureKey="withdraw"><WithdrawPage /></ProtectedRoute>} />
+              <Route path="/advance-payment" element={<ProtectedRoute featureKey="advancePayment"><AdvancePayment /></ProtectedRoute>} />
+              <Route path="/coupon" element={<ProtectedRoute featureKey="coupon"><CouponApply /></ProtectedRoute>} />
+              <Route path="/wallet" element={<ProtectedRoute featureKey="wallet"><WalletPage /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute featureKey="chat"><ChatList /></ProtectedRoute>} />
+              <Route path="/chat/:id" element={<ProtectedRoute featureKey="chat"><ChatPage /></ProtectedRoute>} />
+              <Route path="/attendance" element={<ProtectedRoute featureKey="attendance"><AttendanceList /></ProtectedRoute>} />
+              <Route path="/attendance/:id" element={<ProtectedRoute featureKey="attendance"><AttendancePage /></ProtectedRoute>} />
+              <Route path="/reviews" element={<ProtectedRoute featureKey="review"><ReviewPage /></ProtectedRoute>} />
+              <Route path="/disputes" element={<ProtectedRoute featureKey="dispute"><DisputePage /></ProtectedRoute>} />
+              <Route path="/materials" element={<ProtectedRoute featureKey="material"><MaterialPage /></ProtectedRoute>} />
+              <Route path="/materials/:id" element={<ProtectedRoute featureKey="materialDetails"><MaterialDetails /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute featureKey="profile"><ProfilePage /></ProtectedRoute>} />
+              <Route path="/mistri-verify" element={<ProtectedRoute featureKey="mistriVerify"><MistriVerify /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </main>
+      </div>
+      <Footer />
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppLayout />
+    </BrowserRouter>
+  );
+}
+
