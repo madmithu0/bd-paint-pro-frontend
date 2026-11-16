@@ -186,24 +186,28 @@ const AppLayout = () => {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/verify-otp" element={<VerifyOTP />} />
               <Route path="/legal/:type" element={<LegalPages />} />
+              <Route path="/contract" element={<ContractPage />} />
 
+              {/* Dashboard & Core */}
               <Route path="/dashboard" element={<ProtectedRoute featureKey="dashboard"><Dashboard /></ProtectedRoute>} />
+              <Route path="/search" element={<ProtectedRoute featureKey="search"><SearchPage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute featureKey="settings"><SettingsPage /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute featureKey="reports"><ReportPage /></ProtectedRoute>} />
+              <Route path="/invoices" element={<ProtectedRoute featureKey="invoices"><InvoicePage /></ProtectedRoute>} />
+              <Route path="/schedule" element={<ProtectedRoute featureKey="schedule"><SchedulePage /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute featureKey="notifications"><NotificationPage /></ProtectedRoute>} />
+
+              {/* Jobs */}
               <Route path="/jobs/create" element={<ProtectedRoute featureKey="jobCreate"><JobCreate /></ProtectedRoute>} />
               <Route path="/jobs" element={<ProtectedRoute featureKey="jobList"><JobList /></ProtectedRoute>} />
               <Route path="/jobs/:id" element={<ProtectedRoute featureKey="jobDetails"><JobDetails /></ProtectedRoute>} />
               <Route path="/jobs/:id/cancel" element={<ProtectedRoute featureKey="jobCancel"><JobCancel /></ProtectedRoute>} />
               <Route path="/jobs/:id/otp" element={<ProtectedRoute featureKey="jobOtp"><JobOtp /></ProtectedRoute>} />
 
-              <Route path="/teams/create" element={<ProtectedRoute featureKey="team"><TeamCreate /></ProtectedRoute>} />
-              <Route path="/teams" element={<ProtectedRoute featureKey="team"><TeamList /></ProtectedRoute>} />
-              <Route path="/teams/:id" element={<ProtectedRoute featureKey="team"><TeamDetails /></ProtectedRoute>} />
+              {/* Teams */}
+              <Route path="/teams/create" element={<ProtectedRoute featureKey="teamCreate"><TeamCreate /></ProtectedRoute>} />
+              <Route path="/teams" element={<ProtectedRoute featureKey="teamList"><TeamList /></ProtectedRoute>} />
+              <Route path="/teams/:id" element={<ProtectedRoute featureKey="teamDetails"><TeamDetails /></ProtectedRoute>} />
 
-              <Route path="/payment/:jobId" element={<ProtectedRoute featureKey="payment"><PaymentPage /></ProtectedRoute>} />
-              <Route path="/payment/details/:id" element={<ProtectedRoute featureKey="payment"><PaymentDetails /></ProtectedRoute>} />
-              <Route path="/payment/status/:id" element={<ProtectedRoute featureKey="payment"><PaymentStatus /></ProtectedRoute>} />
-              <Route path="/payment/advance/:jobId" element={<ProtectedRoute featureKey="payment"><AdvancePayment /></ProtectedRoute>} />
-              <Route path="/payment/coupon" element={<ProtectedRoute featureKey="payment"><CouponApply /></ProtectedRoute>} />
-              <Route path="/withdraw" element={<ProtectedRoute featureKey="withdraw"><WithdrawPage /></ProtectedRoute>} />
-              <Route path="/wallet" element={<ProtectedRoute featureKey="wallet"><WalletPage /></ProtectedRoute>} />
-
-              <Route path="/chat" element={<ProtectedRoute featureKey="chat"><ChatList /></ProtectedRoute>} />
+              {/* Payments & Wallet */}
+              <Route path="/payments" element={<ProtectedRoute featureKey="payment"><PaymentPage /></ProtectedRoute>} />
