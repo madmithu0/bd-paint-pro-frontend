@@ -52,11 +52,8 @@ const SchedulePage = lazy(() => import('./pages/SchedulePage'));
 const ContractPage = lazy(() => import('./pages/Legal/ContractPage'));
 const LegalPages = lazy(() => import('./pages/Legal/LegalPages'));
 const NotFound = lazy(() => import('./pages/NotFound'));
-
-// Tier 3: Isolated Super Admin Lazy Imports
 const SuperVerify = lazy(() => import('./pages/Admin/SuperVerify'));
 const SuperAdminDashboard = lazy(() => import('./pages/Admin/SuperAdminDashboard'));
-
 class ComponentErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -187,8 +184,6 @@ const AppLayout = () => {
               <Route path="/verify-otp" element={<VerifyOTP />} />
               <Route path="/legal/:type" element={<LegalPages />} />
               <Route path="/contract" element={<ContractPage />} />
-
-              {/* Dashboard & Core */}
               <Route path="/dashboard" element={<ProtectedRoute featureKey="dashboard"><Dashboard /></ProtectedRoute>} />
               <Route path="/search" element={<ProtectedRoute featureKey="search"><SearchPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute featureKey="settings"><SettingsPage /></ProtectedRoute>} />
@@ -196,20 +191,14 @@ const AppLayout = () => {
               <Route path="/invoices" element={<ProtectedRoute featureKey="invoices"><InvoicePage /></ProtectedRoute>} />
               <Route path="/schedule" element={<ProtectedRoute featureKey="schedule"><SchedulePage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute featureKey="notifications"><NotificationPage /></ProtectedRoute>} />
-
-              {/* Jobs */}
               <Route path="/jobs/create" element={<ProtectedRoute featureKey="jobCreate"><JobCreate /></ProtectedRoute>} />
               <Route path="/jobs" element={<ProtectedRoute featureKey="jobList"><JobList /></ProtectedRoute>} />
               <Route path="/jobs/:id" element={<ProtectedRoute featureKey="jobDetails"><JobDetails /></ProtectedRoute>} />
               <Route path="/jobs/:id/cancel" element={<ProtectedRoute featureKey="jobCancel"><JobCancel /></ProtectedRoute>} />
               <Route path="/jobs/:id/otp" element={<ProtectedRoute featureKey="jobOtp"><JobOtp /></ProtectedRoute>} />
-
-              {/* Teams */}
               <Route path="/teams/create" element={<ProtectedRoute featureKey="teamCreate"><TeamCreate /></ProtectedRoute>} />
               <Route path="/teams" element={<ProtectedRoute featureKey="teamList"><TeamList /></ProtectedRoute>} />
               <Route path="/teams/:id" element={<ProtectedRoute featureKey="teamDetails"><TeamDetails /></ProtectedRoute>} />
-
-              {/* Payments & Wallet */}
               <Route path="/payments" element={<ProtectedRoute featureKey="payment"><PaymentPage /></ProtectedRoute>} />
               <Route path="/payments/:id" element={<ProtectedRoute featureKey="paymentDetails"><PaymentDetails /></ProtectedRoute>} />
               <Route path="/payment-status" element={<ProtectedRoute featureKey="paymentStatus"><PaymentStatus /></ProtectedRoute>} />
@@ -244,4 +233,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
