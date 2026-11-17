@@ -123,13 +123,12 @@ const SuperVerify = ({ onVerifySuccess }) => {
         showToast('Layer 2: Gmail OTP Verified', 'success');
       }
     } catch (err) {
-      setLayers((prev) => ({ ...prev, gmailOtp: false }));
+      setLayers((prev) => ({ ...prev, gmailVerify: false }));
       showToast(err.response?.data?.message || 'Invalid Gmail OTP', 'error');
     } finally {
       setLoading((prev) => ({ ...prev, gmailVerify: false }));
     }
   };
-
   // ================= LAYER 3: 5-SECOND LIVE VOICE =================
   const handleRecordVoice = async () => {
     if (isRecordingVoice || loading.voice) return;
@@ -280,6 +279,31 @@ const SuperVerify = ({ onVerifySuccess }) => {
         navigate('/x9-super-2026/dashboard');
       }
     } catch (err) {
+      showToast(err.response?.data?.message || 'Session lock verification failed', 'error');
+    } finally {
+      setLoading((prev) => ({ ...prev, finalUnlock: false }));
+    }
+  };
+
+  const handleHardwareRecovery = async (e) => {
+    e.preventDefault();
+    if (!recoveryKey.trim()) return;
+    setLoading((prev) => ({ ...prev, finalUnlock: true }));
+    try {
+      const res = await api.post('/x9-super-2026/hardware-recovery', { recoveryKey });
+      if (res.data?.token) {
+        localStorage.setItem('super_admin_4layer_token', res.data.token);
+        showToast('Emergency Hardware Recovery Verified', 'success');
+        if (onVerifySuccess) onVerifySuccess(res.data.token);
+        navigate('/x9-super-2026/dashboard');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Invalid Hardware Recovery Key', 'error');
+    } finally {
+      setLoading((prev) => ({ ...prev, finalUnlock: false }));
+    }
+  };
+
   // Reusable Status Badge / Green Checkmark Component
   const renderStatusBadge = (isVerified) => (
     <span
@@ -304,7 +328,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
       )}
     </span>
   );
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 md:p-8 select-none">
       <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
@@ -470,3 +493,22 @@ const SuperVerify = ({ onVerifySuccess }) => {
           <div className={`p-5 rounded-xl border transition-all flex flex-col justify-between ${layers.liveFace3D ? 'bg-emerald-950/15 border-emerald-500/40' : 'bg-slate-950/60 border-slate-800'}`}>
             <div>
               <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-slate-200">Layer 4: Live 3D Face (Threshold ≥ 0.90)</h2>
+                {renderStatusBadge(layers.liveFace3D)}
+              </div>
+              <p className="text-xs text-slate-400 mb-3">
+                Requires live 3D head movement (Left, Right, Up, Down) & eye blink. Static photos are rejected.
+              </p>
+            </div>
+
+            {isRecordingFace && (
+              <div className="relative mb-3 rounded-lg overflow-hidden border border-amber-500/60 bg-black aspect-video">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                <div className="absolute bottom-2 inset-x-2 bg-slate-950/85 border border-amber-500/40 text-amber-300 text-xs font-bold text-center py-1.5 px-2 rounded">
+                  {facePrompt}
