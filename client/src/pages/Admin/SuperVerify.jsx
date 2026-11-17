@@ -448,7 +448,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
               </button>
             </form>
           </div>
-
           {/* LAYER 3: 5-SECOND LIVE VOICE RECORDING */}
           <div className={`p-5 rounded-xl border transition-all flex flex-col justify-between ${layers.liveVoice ? 'bg-emerald-950/15 border-emerald-500/40' : 'bg-slate-950/60 border-slate-800'}`}>
             <div>
@@ -512,3 +511,80 @@ const SuperVerify = ({ onVerifySuccess }) => {
                 />
                 <div className="absolute bottom-2 inset-x-2 bg-slate-950/85 border border-amber-500/40 text-amber-300 text-xs font-bold text-center py-1.5 px-2 rounded">
                   {facePrompt}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleRecordFace3D}
+              disabled={isRecordingFace || loading.face || layers.liveFace3D}
+              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-xs font-bold uppercase tracking-wider rounded-lg transition"
+            >
+              {layers.liveFace3D
+                ? 'Live 3D Face Biometric Confirmed'
+                : loading.face
+                ? 'Verifying 3D Depth & Liveness...'
+                : isRecordingFace
+                ? 'Capturing 3D Head Movement...'
+                : 'Capture Live 3D Face Video'}
+            </button>
+          </div>
+        </div>
+
+        {/* Footer Unlock Action & Hardware Recovery Fallback */}
+        <div className="bg-slate-950 border-t border-slate-800 p-6 space-y-4">
+          <button
+            type="button"
+            onClick={handleFinalUnlock}
+            disabled={!allLayersGreen || loading.finalUnlock}
+            className={`w-full py-3.5 rounded-xl font-bold text-sm uppercase tracking-widest transition-all ${
+              allLayersGreen
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_25px_rgba(16,185,129,0.4)] cursor-pointer'
+                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+            }`}
+          >
+            {loading.finalUnlock
+              ? 'Initializing Super Admin Session...'
+              : allLayersGreen
+              ? 'Enter Stealth Control Room (All 4 Layers Green)'
+              : 'Control Room Locked (Complete All 4 Layers Above)'}
+          </button>
+
+          {/* Offline Hardware Recovery Key Toggle (File 161 Spec) */}
+          <div className="pt-2 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+            <span>Biometric APIs down? Use emergency hardware fallback.</span>
+            <button
+              type="button"
+              onClick={() => setShowRecovery(!showRecovery)}
+              className="text-slate-400 hover:text-amber-400 underline font-mono"
+            >
+              {showRecovery ? 'Hide Hardware Key Input' : 'Offline Hardware Recovery Key'}
+            </button>
+          </div>
+
+          {showRecovery && (
+            <form onSubmit={handleHardwareRecovery} className="flex gap-2 pt-2">
+              <input
+                type="password"
+                value={recoveryKey}
+                onChange={(e) => setRecoveryKey(e.target.value)}
+                placeholder="Enter Offline Hardware Recovery Key..."
+                className="w-full bg-slate-900 border border-amber-500/40 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={loading.finalUnlock || !recoveryKey}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg whitespace-nowrap"
+              >
+                Emergency Unlock
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SuperVerify;
