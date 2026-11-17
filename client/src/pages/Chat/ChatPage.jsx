@@ -67,7 +67,7 @@ export default function ChatPage() {
   };
 
   const handlePhotoUpload = async (e) => {
-    const file = e.target.files?.;
+    const file = e.target.files && e.target.files.item(0);
     if (!file) return;
 
     const formData = new FormData();
