@@ -17,7 +17,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
 
   const handleAvatarChange = (e) => {
-    const file = e.target.files?.;
+    const file = e.target.files?.[0];
     if (!file) return;
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
