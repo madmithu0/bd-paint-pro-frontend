@@ -54,6 +54,24 @@ const LegalPages = lazy(() => import('./pages/Legal/LegalPages'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const SuperVerify = lazy(() => import('./pages/Admin/SuperVerify'));
 const SuperAdminDashboard = lazy(() => import('./pages/Admin/SuperAdminDashboard'));
+const getStoredSuperToken = () => {
+  try {
+    return localStorage.getItem('superAdminToken') || '';
+  } catch {
+    return '';
+  }
+};
+
+const setStoredSuperToken = (token) => {
+  try {
+    if (token) {
+      localStorage.setItem('superAdminToken', token);
+    } else {
+      localStorage.removeItem('superAdminToken');
+    }
+  } catch {}
+};
+
 class ComponentErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -109,15 +127,15 @@ const ProtectedRoute = ({ children, featureKey }) => {
 };
 
 const SuperAdminStealthGate = () => {
-  const [superToken, setSuperToken] = useState(() => localStorage.getItem('superAdminToken') || '');
+  const [superToken, setSuperToken] = useState(getStoredSuperToken);
 
   const handleUnlockSuccess = (token) => {
-    localStorage.setItem('superAdminToken', token);
+    setStoredSuperToken(token);
     setSuperToken(token);
   };
 
   const handleSuperLogout = () => {
-    localStorage.removeItem('superAdminToken');
+    setStoredSuperToken('');
     setSuperToken('');
   };
 
@@ -135,13 +153,15 @@ const SuperAdminStealthGate = () => {
     </ComponentErrorBoundary>
   );
 };
-
 const AppLayout = () => {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { globalKill } = useKill();
 
-  const isStealthRoute = location.pathname.startsWith('/x9-super-2026');
+  const normalizedPath = location.pathname.toLowerCase();
+  const isStealthRoute =
+    normalizedPath === '/x9-super-2026' ||
+    normalizedPath.startsWith('/x9-super-2026/');
 
   if (isStealthRoute) {
     return (
@@ -149,7 +169,9 @@ const AppLayout = () => {
         <Toast />
         <Suspense fallback={<Loading fullScreen={true} />}>
           <Routes>
+            <Route path="/x9-super-2026" element={<SuperAdminStealthGate />} />
             <Route path="/x9-super-2026/*" element={<SuperAdminStealthGate />} />
+            <Route path="*" element={<SuperAdminStealthGate />} />
           </Routes>
         </Suspense>
       </div>
