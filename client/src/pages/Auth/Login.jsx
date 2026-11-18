@@ -25,8 +25,20 @@ const Login = () => {
         password,
       });
 
-      if (res.data?.token) {
-        localStorage.setItem('token', res.data.token);
+      const authToken = res.data?.accessToken || res.data?.token;
+      if (authToken && res.data?.user) {
+        if (res.data.user.verify === false) {
+          showToast('Account not verified yet. Redirecting to free verification...', 'warning');
+          return navigate('/verify-otp', {
+            state: {
+              phone: res.data.user.phone || '',
+              email: res.data.user.email || '',
+              purpose: 'LOGIN',
+            },
+          });
+        }
+
+        localStorage.setItem('token', authToken);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         showToast('Login successful! Welcome back.', 'success');
         navigate('/dashboard');
@@ -108,7 +120,7 @@ const Login = () => {
             {loading ? 'Signing In...' : 'Sign In to Account'}
           </button>
 
-          <div className="pt-4 border-t border-slate-100 text-center">
+          <div className="pt-4 border-t border-slate-100 text-center space-y-2">
             <p className="text-sm text-slate-600">
               Don&apos;t have an account?{' '}
               <Link
@@ -116,6 +128,15 @@ const Login = () => {
                 className="font-bold text-indigo-600 hover:text-indigo-500 transition"
               >
                 Create Account
+              </Link>
+            </p>
+            <p className="text-xs text-slate-500">
+              Need to verify your Phone or Gmail?{' '}
+              <Link
+                to="/verify-otp"
+                className="font-semibold text-emerald-600 hover:text-emerald-500 underline"
+              >
+                Verify Free OTP
               </Link>
             </p>
           </div>
