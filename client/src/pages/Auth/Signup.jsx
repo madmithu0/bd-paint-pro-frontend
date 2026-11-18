@@ -19,6 +19,7 @@ export default function Signup() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    email: '',
     role: 'Customer',
     password: '',
     confirmPassword: '',
@@ -40,7 +41,7 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { name, phone, role, password, confirmPassword, acceptTerms } = formData;
+    const { name, phone, email, role, password, confirmPassword, acceptTerms } = formData;
 
     if (!SIGNUP_ROLES.some((r) => r.value === role)) {
       error('Invalid role selected.');
@@ -72,12 +73,19 @@ export default function Signup() {
       await api.post('/auth/signup', {
         name: name.trim(),
         phone: phone.trim(),
+        email: email.trim() ? email.trim().toLowerCase() : undefined,
         role,
         password,
       });
 
-      success('Account created. Please verify OTP sent to your phone.');
-      navigate('/verify-otp', { state: { phone: phone.trim() } });
+      success('Account created! Verify your Mobile or Gmail for free.');
+      navigate('/verify-otp', {
+        state: {
+          phone: phone.trim(),
+          email: email.trim() ? email.trim().toLowerCase() : '',
+          purpose: 'SIGNUP',
+        },
+      });
     } catch (err) {
       error(err.response?.data?.message || 'Registration failed.');
     } finally {
@@ -119,6 +127,17 @@ export default function Signup() {
             required
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Gmail Address (For Free Backup OTP)</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="example@gmail.com"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 dark:border-slate-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+        </div>
 
         <div>
           <label className="block text-sm font-medium mb-1">Account Role</label>
@@ -128,9 +147,9 @@ export default function Signup() {
             onChange={handleChange}
             className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
           >
-            {SIGNUP_ROLES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
+            {SIGNUP_ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
               </option>
             ))}
           </select>
@@ -162,24 +181,19 @@ export default function Signup() {
           />
         </div>
 
-        <label className="flex items-start gap-2 text-xs text-gray-600 dark:text-slate-400 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 cursor-pointer">
           <input
             type="checkbox"
             name="acceptTerms"
             checked={formData.acceptTerms}
             onChange={handleChange}
-            className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-600"
           />
           <span>
             I agree to the{' '}
-            <Link to="/legal/terms" className="text-blue-600 underline">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link to="/legal/privacy" className="text-blue-600 underline">
-              Privacy Policy
+            <Link to="/legal" className="text-blue-600 hover:underline">
+              Terms & Privacy Policy
             </Link>
-            .
           </span>
         </label>
 
@@ -188,12 +202,12 @@ export default function Signup() {
           disabled={loading}
           className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition"
         >
-          {loading ? 'Creating Account...' : 'Register'}
+          {loading ? 'Creating Account...' : 'Create Account'}
         </button>
       </form>
 
-      <p className="text-sm text-center text-gray-600 dark:text-slate-400 mt-6">
-        Already registered?{' '}
+      <p className="mt-6 text-center text-sm text-gray-600 dark:text-slate-400">
+        Already have an account?{' '}
         <Link to="/login" className="text-blue-600 font-semibold hover:underline">
           Login here
         </Link>
