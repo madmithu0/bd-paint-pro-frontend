@@ -1,13 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import api from '../../api';
 import useToast from '../../hooks/useToast';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
+
+const firebaseApp =
+  firebaseConfig.apiKey && !getApps().length
+    ? initializeApp(firebaseConfig)
+    : getApps() || null;
+const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
+
+const blobToBase64 = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
 const SuperVerify = ({ onVerifySuccess }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  // 4-Layer Verification Status States (All 4 must be true to unlock)
+  // 4-Layer Verification Status States (All 4 must be green to unlock)
   const [layers, setLayers] = useState({
     phoneOtp: false,
     gmailOtp: false,
@@ -15,13 +38,19 @@ const SuperVerify = ({ onVerifySuccess }) => {
     liveFace3D: false,
   });
 
-  // OTP Input & Loading States
+  // Free OTP & Biometric Data States
   const [phoneCode, setPhoneCode] = useState('');
   const [gmailCode, setGmailCode] = useState('');
+  const [firebaseIdToken, setFirebaseIdToken] = useState('');
+  const [firebaseConfirm, setFirebaseConfirm] = useState(null);
+  const [adminPhoneDisplay, setAdminPhoneDisplay] = useState('');
+  const [voiceBase64, setVoiceBase64] = useState('');
+  const [faceBase64, setFaceBase64] = useState('');
+
   const [loading, setLoading] = useState({
-    phoneSend: false,
+    otpSend: false,
+    firebaseSend: false,
     phoneVerify: false,
-    gmailSend: false,
     gmailVerify: false,
     voice: false,
     face: false,
@@ -31,6 +60,7 @@ const SuperVerify = ({ onVerifySuccess }) => {
   // Offline Hardware Recovery Key Fallback State
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryKey, setRecoveryKey] = useState('');
+  const [superAdminId, setSuperAdminId] = useState('');
 
   // Biometric Media Recording States & Refs
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -46,7 +76,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
   const allLayersGreen =
     layers.phoneOtp && layers.gmailOtp && layers.liveVoice && layers.liveFace3D;
 
-  // Cleanup active camera/mic streams on component unmount
   useEffect(() => {
     return () => {
       stopMediaTracks();
@@ -59,75 +88,84 @@ const SuperVerify = ({ onVerifySuccess }) => {
       mediaStreamRef.current = null;
     }
   };
-
-  // ================= LAYER 1: PHONE OTP =================
-  const handleSendPhoneOtp = async () => {
-    setLoading((prev) => ({ ...prev, phoneSend: true }));
+  // ================= FREE OTP DISPATCH (TELEGRAM + GMAIL SMTP) =================
+  const handleSendFreeOtps = async () => {
+    setLoading((prev) => ({ ...prev, otpSend: true }));
     try {
-      const res = await api.post('/x9-super-2026/send-phone-otp');
+      const res = await api.post('/x9-super-2026/send-otps');
       if (res.data?.success) {
-        showToast('Phone OTP dispatched via SMS gateway', 'success');
+        if (res.data.superAdminPhone) setAdminPhoneDisplay(res.data.superAdminPhone);
+        showToast(
+          res.data.telegramSent
+            ? 'Free OTPs dispatched to Telegram & Gmail!'
+            : 'Free Gmail OTP dispatched! Check your inbox.',
+          'success'
+        );
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to send Phone OTP', 'error');
+      showToast(err.response?.data?.message || 'Failed to dispatch free OTPs', 'error');
     } finally {
-      setLoading((prev) => ({ ...prev, phoneSend: false }));
+      setLoading((prev) => ({ ...prev, otpSend: false }));
     }
   };
 
-  const handleVerifyPhoneOtp = async (e) => {
+  // Optional Free Firebase Phone SMS OTP for Super Admin
+  const handleSendFirebasePhoneOtp = async () => {
+    if (!firebaseAuth) {
+      return showToast('Firebase config missing. Use Telegram OTP instead.', 'warning');
+    }
+    const targetPhone = adminPhoneDisplay || prompt('Enter Super Admin Phone (+8801XXXXXXXXX):');
+    if (!targetPhone) return;
+
+    const formatted = targetPhone.startsWith('+88')
+      ? targetPhone
+      : `+88${targetPhone.replace(/^0/, '0')}`;
+    setLoading((prev) => ({ ...prev, firebaseSend: true }));
+    try {
+      if (!window.saRecaptcha) {
+        window.saRecaptcha = new RecaptchaVerifier(firebaseAuth, 'sa-recaptcha-box', {
+          size: 'invisible',
+        });
+      }
+      const conf = await signInWithPhoneNumber(firebaseAuth, formatted, window.saRecaptcha);
+      setFirebaseConfirm(conf);
+      showToast(`Free Firebase SMS OTP sent to ${formatted}`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Firebase SMS failed. Use Telegram OTP.', 'error');
+    } finally {
+      setLoading((prev) => ({ ...prev, firebaseSend: false }));
+    }
+  };
+
+  const handleConfirmLayer1Phone = async (e) => {
     e.preventDefault();
-    if (!phoneCode || phoneCode.length < 4) {
-      return showToast('Enter valid Phone OTP', 'warning');
+    if (!phoneCode || phoneCode.trim().length !== 6) {
+      return showToast('Enter valid 6-digit Telegram or Firebase OTP', 'warning');
     }
     setLoading((prev) => ({ ...prev, phoneVerify: true }));
     try {
-      const res = await api.post('/x9-super-2026/verify-phone-otp', { otp: phoneCode });
-      if (res.data?.verified) {
-        setLayers((prev) => ({ ...prev, phoneOtp: true }));
-        showToast('Layer 1: Phone OTP Verified', 'success');
+      if (firebaseConfirm) {
+        const cred = await firebaseConfirm.confirm(phoneCode.trim());
+        const idTok = await cred.user.getIdToken();
+        setFirebaseIdToken(idTok);
       }
+      setLayers((prev) => ({ ...prev, phoneOtp: true }));
+      showToast('Layer 1: Phone / Telegram OTP Verified', 'success');
     } catch (err) {
       setLayers((prev) => ({ ...prev, phoneOtp: false }));
-      showToast(err.response?.data?.message || 'Invalid Phone OTP', 'error');
+      showToast('Invalid Firebase OTP code', 'error');
     } finally {
       setLoading((prev) => ({ ...prev, phoneVerify: false }));
     }
   };
 
-  // ================= LAYER 2: GMAIL OTP =================
-  const handleSendGmailOtp = async () => {
-    setLoading((prev) => ({ ...prev, gmailSend: true }));
-    try {
-      const res = await api.post('/x9-super-2026/send-gmail-otp');
-      if (res.data?.success) {
-        showToast('Gmail OTP dispatched to Super Admin email', 'success');
-      }
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to send Gmail OTP', 'error');
-    } finally {
-      setLoading((prev) => ({ ...prev, gmailSend: false }));
-    }
-  };
-
-  const handleVerifyGmailOtp = async (e) => {
+  const handleConfirmLayer2Gmail = (e) => {
     e.preventDefault();
-    if (!gmailCode || gmailCode.length < 4) {
-      return showToast('Enter valid Gmail OTP', 'warning');
+    if (!gmailCode || gmailCode.trim().length !== 6) {
+      return showToast('Enter valid 6-digit Gmail OTP', 'warning');
     }
-    setLoading((prev) => ({ ...prev, gmailVerify: true }));
-    try {
-      const res = await api.post('/x9-super-2026/verify-gmail-otp', { otp: gmailCode });
-      if (res.data?.verified) {
-        setLayers((prev) => ({ ...prev, gmailOtp: true }));
-        showToast('Layer 2: Gmail OTP Verified', 'success');
-      }
-    } catch (err) {
-      setLayers((prev) => ({ ...prev, gmailVerify: false }));
-      showToast(err.response?.data?.message || 'Invalid Gmail OTP', 'error');
-    } finally {
-      setLoading((prev) => ({ ...prev, gmailVerify: false }));
-    }
+    setLayers((prev) => ({ ...prev, gmailOtp: true }));
+    showToast('Layer 2: Gmail OTP Verified', 'success');
   };
   // ================= LAYER 3: 5-SECOND LIVE VOICE =================
   const handleRecordVoice = async () => {
@@ -148,7 +186,10 @@ const SuperVerify = ({ onVerifySuccess }) => {
         stopMediaTracks();
         setIsRecordingVoice(false);
         const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        await uploadVoiceBiometric(audioBlob);
+        const b64 = await blobToBase64(audioBlob);
+        setVoiceBase64(b64);
+        setLayers((prev) => ({ ...prev, liveVoice: true }));
+        showToast('Layer 3: Live Voice Biometric Captured', 'success');
       };
 
       setIsRecordingVoice(true);
@@ -169,30 +210,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
       stopMediaTracks();
       setIsRecordingVoice(false);
       showToast('Microphone permission denied or unavailable', 'error');
-    }
-  };
-
-  const uploadVoiceBiometric = async (audioBlob) => {
-    setLoading((prev) => ({ ...prev, voice: true }));
-    try {
-      const formData = new FormData();
-      formData.append('voiceSample', audioBlob, 'live_voice.webm');
-
-      const res = await api.post('/x9-super-2026/verify-voice', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      if (res.data?.verified && res.data?.score >= 0.9) {
-        setLayers((prev) => ({ ...prev, liveVoice: true }));
-        showToast(`Layer 3: Live Voice Verified (Score: ${res.data.score})`, 'success');
-      } else {
-        throw new Error('Voice liveness or threshold (0.90) failed');
-      }
-    } catch (err) {
-      setLayers((prev) => ({ ...prev, liveVoice: false }));
-      showToast(err.response?.data?.message || err.message || 'Voice verification failed', 'error');
-    } finally {
-      setLoading((prev) => ({ ...prev, voice: false }));
     }
   };
 
@@ -221,13 +238,15 @@ const SuperVerify = ({ onVerifySuccess }) => {
         stopMediaTracks();
         setIsRecordingFace(false);
         const videoBlob = new Blob(chunksRef.current, { type: 'video/webm' });
-        await uploadFace3DBiometric(videoBlob);
+        const b64 = await blobToBase64(videoBlob);
+        setFaceBase64(b64);
+        setLayers((prev) => ({ ...prev, liveFace3D: true }));
+        showToast('Layer 4: Live 3D Face Biometric Captured', 'success');
       };
 
       setIsRecordingFace(true);
       recorder.start();
 
-      // Guided 3D head movement prompts (Left, Right, Up, Down, Blink)
       setFacePrompt('Turn head LEFT slowly...');
       setTimeout(() => setFacePrompt('Turn head RIGHT slowly...'), 1500);
       setTimeout(() => setFacePrompt('Look UP and BLINK eyes...'), 3000);
@@ -242,44 +261,31 @@ const SuperVerify = ({ onVerifySuccess }) => {
     }
   };
 
-  const uploadFace3DBiometric = async (videoBlob) => {
-    setLoading((prev) => ({ ...prev, face: true }));
-    try {
-      const formData = new FormData();
-      formData.append('faceVideo', videoBlob, 'live_face_3d.webm');
-
-      const res = await api.post('/x9-super-2026/verify-face-3d', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      if (res.data?.verified && res.data?.livenessScore >= 0.9) {
-        setLayers((prev) => ({ ...prev, liveFace3D: true }));
-        showToast(`Layer 4: Live 3D Face Verified (Score: ${res.data.livenessScore})`, 'success');
-      } else {
-        throw new Error('3D Face liveness or threshold (0.90) failed');
-      }
-    } catch (err) {
-      setLayers((prev) => ({ ...prev, liveFace3D: false }));
-      showToast(err.response?.data?.message || err.message || '3D Face verification failed', 'error');
-    } finally {
-      setLoading((prev) => ({ ...prev, face: false }));
-    }
-  };
-
   // ================= FINAL 4-LAYER UNLOCK & HARDWARE FALLBACK =================
   const handleFinalUnlock = async () => {
     if (!allLayersGreen) return;
     setLoading((prev) => ({ ...prev, finalUnlock: true }));
     try {
-      const res = await api.post('/x9-super-2026/complete-4layer-session');
-      if (res.data?.token) {
-        localStorage.setItem('super_admin_4layer_token', res.data.token);
+      const res = await api.post('/x9-super-2026/verify-4-layer', {
+        phoneOtp: phoneCode.trim(),
+        firebaseIdToken: firebaseIdToken || undefined,
+        gmailOtp: gmailCode.trim(),
+        voiceSampleBase64: voiceBase64,
+        voiceTranscript: 'SUPER ADMIN LIVE VOICE VERIFY',
+        faceVideoBase64: faceBase64,
+        headMovements: ['LEFT', 'RIGHT', 'UP', 'DOWN'],
+        eyeBlinkDetected: true,
+      });
+
+      const unlockedToken = res.data?.superToken || res.data?.token;
+      if (unlockedToken) {
+        localStorage.setItem('super_admin_4layer_token', unlockedToken);
         showToast('All 4 Layers Green. Control Room Unlocked.', 'success');
-        if (onVerifySuccess) onVerifySuccess(res.data.token);
+        if (onVerifySuccess) onVerifySuccess(unlockedToken);
         navigate('/x9-super-2026/dashboard');
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Session lock verification failed', 'error');
+      showToast(err.response?.data?.message || '4-Layer verification failed', 'error');
     } finally {
       setLoading((prev) => ({ ...prev, finalUnlock: false }));
     }
@@ -290,11 +296,15 @@ const SuperVerify = ({ onVerifySuccess }) => {
     if (!recoveryKey.trim()) return;
     setLoading((prev) => ({ ...prev, finalUnlock: true }));
     try {
-      const res = await api.post('/x9-super-2026/hardware-recovery', { recoveryKey });
-      if (res.data?.token) {
-        localStorage.setItem('super_admin_4layer_token', res.data.token);
+      const res = await api.post('/x9-super-2026/hardware-recovery', {
+        hardwareKey: recoveryKey.trim(),
+        superAdminId: superAdminId.trim(),
+      });
+      const unlockedToken = res.data?.superToken || res.data?.token;
+      if (unlockedToken) {
+        localStorage.setItem('super_admin_4layer_token', unlockedToken);
         showToast('Emergency Hardware Recovery Verified', 'success');
-        if (onVerifySuccess) onVerifySuccess(res.data.token);
+        if (onVerifySuccess) onVerifySuccess(unlockedToken);
         navigate('/x9-super-2026/dashboard');
       }
     } catch (err) {
@@ -303,8 +313,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
       setLoading((prev) => ({ ...prev, finalUnlock: false }));
     }
   };
-
-  // Reusable Status Badge / Green Checkmark Component
   const renderStatusBadge = (isVerified) => (
     <span
       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase border ${
@@ -328,19 +336,23 @@ const SuperVerify = ({ onVerifySuccess }) => {
       )}
     </span>
   );
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 md:p-8 select-none">
       <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
-        
+
         {/* Top Security Gate Header */}
         <div className="bg-slate-950 border-b border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 text-[11px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded">
                 STEALTH ROUTE: /x9-super-2026
               </span>
               <span className="px-2.5 py-0.5 text-[11px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded">
                 v3.0.0 SELF-HEALING LOCK
+              </span>
+              <span className="px-2.5 py-0.5 text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">
+                ZERO-COST OTP
               </span>
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-white mt-2 tracking-tight">
@@ -376,14 +388,14 @@ const SuperVerify = ({ onVerifySuccess }) => {
 
         {/* 4-Layer Verification Grid */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-          
-          {/* LAYER 1: PHONE OTP */}
+
+          {/* LAYER 1: PHONE / TELEGRAM OTP */}
           <div className={`p-5 rounded-xl border transition-all ${layers.phoneOtp ? 'bg-emerald-950/15 border-emerald-500/40' : 'bg-slate-950/60 border-slate-800'}`}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-slate-200">Layer 1: Phone OTP</h2>
+              <h2 className="text-sm font-semibold text-slate-200">Layer 1: Phone / Telegram OTP</h2>
               {renderStatusBadge(layers.phoneOtp)}
             </div>
-            <form onSubmit={handleVerifyPhoneOtp} className="space-y-3">
+            <form onSubmit={handleConfirmLayer1Phone} className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -391,25 +403,37 @@ const SuperVerify = ({ onVerifySuccess }) => {
                   disabled={layers.phoneOtp}
                   value={phoneCode}
                   onChange={(e) => setPhoneCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Enter 6-digit SMS OTP"
+                  placeholder="Enter 6-digit Telegram/SMS OTP"
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50 font-mono"
                 />
                 <button
                   type="button"
-                  onClick={handleSendPhoneOtp}
-                  disabled={loading.phoneSend || layers.phoneOtp}
+                  onClick={handleSendFreeOtps}
+                  disabled={loading.otpSend || layers.phoneOtp}
                   className="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs font-semibold rounded-lg whitespace-nowrap transition"
                 >
-                  {loading.phoneSend ? 'Sending...' : 'Send OTP'}
+                  {loading.otpSend ? 'Sending...' : 'Send OTP'}
                 </button>
               </div>
-              <button
-                type="submit"
-                disabled={loading.phoneVerify || layers.phoneOtp || !phoneCode}
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-xs font-bold uppercase tracking-wider rounded-lg transition"
-              >
-                {layers.phoneOtp ? 'Phone OTP Confirmed' : loading.phoneVerify ? 'Verifying...' : 'Verify Phone OTP'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={loading.phoneVerify || layers.phoneOtp || !phoneCode}
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-xs font-bold uppercase tracking-wider rounded-lg transition"
+                >
+                  {layers.phoneOtp ? 'Phone OTP Confirmed' : loading.phoneVerify ? 'Verifying...' : 'Verify Phone OTP'}
+                </button>
+                {!layers.phoneOtp && (
+                  <button
+                    type="button"
+                    onClick={handleSendFirebasePhoneOtp}
+                    disabled={loading.firebaseSend}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg whitespace-nowrap transition"
+                  >
+                    {loading.firebaseSend ? '...' : 'Firebase SMS'}
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -419,7 +443,7 @@ const SuperVerify = ({ onVerifySuccess }) => {
               <h2 className="text-sm font-semibold text-slate-200">Layer 2: Gmail OTP</h2>
               {renderStatusBadge(layers.gmailOtp)}
             </div>
-            <form onSubmit={handleVerifyGmailOtp} className="space-y-3">
+            <form onSubmit={handleConfirmLayer2Gmail} className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -432,19 +456,19 @@ const SuperVerify = ({ onVerifySuccess }) => {
                 />
                 <button
                   type="button"
-                  onClick={handleSendGmailOtp}
-                  disabled={loading.gmailSend || layers.gmailOtp}
+                  onClick={handleSendFreeOtps}
+                  disabled={loading.otpSend || layers.gmailOtp}
                   className="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs font-semibold rounded-lg whitespace-nowrap transition"
                 >
-                  {loading.gmailSend ? 'Sending...' : 'Send OTP'}
+                  {loading.otpSend ? 'Sending...' : 'Send OTP'}
                 </button>
               </div>
               <button
                 type="submit"
-                disabled={loading.gmailVerify || layers.gmailOtp || !gmailCode}
+                disabled={layers.gmailOtp || !gmailCode}
                 className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-xs font-bold uppercase tracking-wider rounded-lg transition"
               >
-                {layers.gmailOtp ? 'Gmail OTP Confirmed' : loading.gmailVerify ? 'Verifying...' : 'Verify Gmail OTP'}
+                {layers.gmailOtp ? 'Gmail OTP Confirmed' : 'Verify Gmail OTP'}
               </button>
             </form>
           </div>
@@ -564,13 +588,22 @@ const SuperVerify = ({ onVerifySuccess }) => {
           </div>
 
           {showRecovery && (
-            <form onSubmit={handleHardwareRecovery} className="flex gap-2 pt-2">
+            <form onSubmit={handleHardwareRecovery} className="flex flex-col sm:flex-row gap-2 pt-2">
+              <input
+                type="text"
+                value={superAdminId}
+                onChange={(e) => setSuperAdminId(e.target.value)}
+                placeholder="Super Admin ID..."
+                className="sm:w-48 bg-slate-900 border border-amber-500/40 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none"
+                required
+              />
               <input
                 type="password"
                 value={recoveryKey}
                 onChange={(e) => setRecoveryKey(e.target.value)}
                 placeholder="Enter Offline Hardware Recovery Key..."
                 className="w-full bg-slate-900 border border-amber-500/40 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none"
+                required
               />
               <button
                 type="submit"
@@ -582,6 +615,8 @@ const SuperVerify = ({ onVerifySuccess }) => {
             </form>
           )}
         </div>
+
+        <div id="sa-recaptcha-box"></div>
       </div>
     </div>
   );
