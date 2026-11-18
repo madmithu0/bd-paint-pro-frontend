@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-const API_BASE_URL = '/api/v1';
+const API_BASE_URL = 'https://onrender.com';
 const MAX_RETRIES = 3;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
     'X-App-Version': 'v3.0.0',
@@ -18,7 +18,9 @@ api.interceptors.request.use(
       return Promise.reject(new Error('API v1 Lock Violation'));
     }
 
-    const token = localStorage.getItem('app_v3_auth_token');
+    const token =
+      localStorage.getItem('super_admin_4layer_token') ||
+      localStorage.getItem('app_v3_auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -35,7 +37,10 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('app_v3_auth_token');
       localStorage.removeItem('app_v3_user_data');
-      if (window.location.pathname !== '/login') {
+      if (
+        window.location.pathname !== '/login' &&
+        !window.location.pathname.includes('x9-super-2026')
+      ) {
         window.location.href = '/login';
       }
       return Promise.reject(error);
