@@ -30,6 +30,18 @@ const SuperVerify = ({ onVerifySuccess }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
+  // Lifetime Voice Enrollment Status (First 10 Minutes of Web Boot)
+  const [voiceEnrollState, setVoiceEnrollState] = useState({
+    loading: true,
+    isEnrolled: false,
+    canEnroll: false,
+    remainingSeconds: 0,
+  });
+  const [isEnrollingVoice, setIsEnrollingVoice] = useState(false);
+  const [enrollCountdown, setEnrollCountdown] = useState(5);
+  const [enrollVoiceBase64, setEnrollVoiceBase64] = useState('');
+  const [submittingEnroll, setSubmittingEnroll] = useState(false);
+
   // 4-Layer Verification Status States (All 4 must be green to unlock)
   const [layers, setLayers] = useState({
     phoneOtp: false,
@@ -77,17 +89,139 @@ const SuperVerify = ({ onVerifySuccess }) => {
     layers.phoneOtp && layers.gmailOtp && layers.liveVoice && layers.liveFace3D;
 
   useEffect(() => {
+    fetchVoiceEnrollmentStatus();
     return () => {
       stopMediaTracks();
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      voiceEnrollState.isEnrolled ||
+      !voiceEnrollState.canEnroll ||
+      voiceEnrollState.remainingSeconds <= 0
+    ) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setVoiceEnrollState((prev) => {
+        if (prev.remainingSeconds <= 1) {
+          clearInterval(interval);
+          return { ...prev, canEnroll: false, remainingSeconds: 0 };
+        }
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    voiceEnrollState.isEnrolled,
+    voiceEnrollState.canEnroll,
+    voiceEnrollState.remainingSeconds,
+  ]);
   const stopMediaTracks = () => {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
     }
   };
+
+  const formatRemainingTime = (totalSeconds) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  // ================= LIFETIME VOICE ENROLLMENT (FIRST 10 MINUTES) =================
+  const fetchVoiceEnrollmentStatus = async () => {
+    try {
+      const res = await api.get('/x9-super-2026/voice-status');
+      if (res.data?.success) {
+        setVoiceEnrollState({
+          loading: false,
+          isEnrolled: Boolean(res.data.isEnrolled),
+          canEnroll: Boolean(res.data.canEnroll),
+          remainingSeconds: Number(res.data.remainingSeconds || 0),
+        });
+      } else {
+        setVoiceEnrollState((prev) => ({ ...prev, loading: false }));
+      }
+    } catch (err) {
+      setVoiceEnrollState((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleRecordEnrollmentVoice = async () => {
+    if (isEnrollingVoice || submittingEnroll) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      chunksRef.current = [];
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stopMediaTracks();
+        setIsEnrollingVoice(false);
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const b64 = await blobToBase64(audioBlob);
+        setEnrollVoiceBase64(b64);
+        showToast('5-Second Master Voice Captured. Click Lock Permanently.', 'success');
+      };
+
+      setIsEnrollingVoice(true);
+      setEnrollCountdown(5);
+      recorder.start();
+
+      const timer = setInterval(() => {
+        setEnrollCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            if (recorder.state === 'recording') recorder.stop();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      stopMediaTracks();
+      setIsEnrollingVoice(false);
+      showToast('Microphone permission denied or unavailable', 'error');
+    }
+  };
+
+  const handleSubmitLifetimeVoice = async () => {
+    if (!enrollVoiceBase64 || submittingEnroll) return;
+    setSubmittingEnroll(true);
+    try {
+      const res = await api.post('/x9-super-2026/enroll-voice', {
+        voiceSampleBase64: enrollVoiceBase64,
+        voiceTranscript: 'SUPER ADMIN LIVE VOICE VERIFY',
+      });
+
+      if (res.data?.success) {
+        setVoiceEnrollState({
+          loading: false,
+          isEnrolled: true,
+          canEnroll: false,
+          remainingSeconds: 0,
+        });
+        setEnrollVoiceBase64('');
+        showToast(res.data.message || 'Lifetime Voice Registered & Locked Permanently!', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to lock lifetime voice', 'error');
+    } finally {
+      setSubmittingEnroll(false);
+    }
+  };
+
   // ================= FREE OTP DISPATCH (TELEGRAM + GMAIL SMTP) =================
   const handleSendFreeOtps = async () => {
     setLoading((prev) => ({ ...prev, otpSend: true }));
@@ -136,7 +270,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
       setLoading((prev) => ({ ...prev, firebaseSend: false }));
     }
   };
-
   const handleConfirmLayer1Phone = async (e) => {
     e.preventDefault();
     if (!phoneCode || phoneCode.trim().length !== 6) {
@@ -167,9 +300,13 @@ const SuperVerify = ({ onVerifySuccess }) => {
     setLayers((prev) => ({ ...prev, gmailOtp: true }));
     showToast('Layer 2: Gmail OTP Verified', 'success');
   };
+
   // ================= LAYER 3: 5-SECOND LIVE VOICE =================
   const handleRecordVoice = async () => {
     if (isRecordingVoice || loading.voice) return;
+    if (!voiceEnrollState.isEnrolled) {
+      return showToast('Please complete Lifetime Master Voice Registration first.', 'warning');
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
@@ -260,7 +397,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
       showToast('Camera permission denied or unavailable', 'error');
     }
   };
-
   // ================= FINAL 4-LAYER UNLOCK & HARDWARE FALLBACK =================
   const handleFinalUnlock = async () => {
     if (!allLayersGreen) return;
@@ -313,6 +449,7 @@ const SuperVerify = ({ onVerifySuccess }) => {
       setLoading((prev) => ({ ...prev, finalUnlock: false }));
     }
   };
+
   const renderStatusBadge = (isVerified) => (
     <span
       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase border ${
@@ -340,7 +477,6 @@ const SuperVerify = ({ onVerifySuccess }) => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 md:p-8 select-none">
       <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
-
         {/* Top Security Gate Header */}
         <div className="bg-slate-950 border-b border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -385,6 +521,64 @@ const SuperVerify = ({ onVerifySuccess }) => {
             ))}
           </div>
         </div>
+        {/* Initial 10-Minute Lifetime Voice Enrollment Banner */}
+        {!voiceEnrollState.loading && !voiceEnrollState.isEnrolled && voiceEnrollState.canEnroll && (
+          <div className="mx-6 mt-6 p-5 rounded-xl bg-amber-950/30 border border-amber-500/50 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-amber-300 uppercase tracking-wider">
+                  Initial Lifetime Voice Registration (First 10 Minutes Only)
+                </h2>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Record your 5-second live voice now. Once locked, this voice becomes your permanent lifetime biometric key.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold">
+                WINDOW CLOSES IN: {formatRemainingTime(voiceEnrollState.remainingSeconds)}
+              </span>
+            </div>
+
+            {isEnrollingVoice && (
+              <div className="w-full bg-rose-950/60 border border-rose-500/40 rounded-lg py-2 px-3 flex items-center justify-between text-xs text-rose-300 font-mono">
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                  CAPTURING LIFETIME MASTER VOICE...
+                </span>
+                <span className="font-bold">{enrollCountdown}s</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={handleRecordEnrollmentVoice}
+                disabled={isEnrollingVoice || submittingEnroll}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition"
+              >
+                {isEnrollingVoice
+                  ? `Recording (${enrollCountdown}s)...`
+                  : enrollVoiceBase64
+                  ? 'Master Voice Captured (Re-record)'
+                  : '1. Record 5-Second Lifetime Voice'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSubmitLifetimeVoice}
+                disabled={!enrollVoiceBase64 || submittingEnroll || isEnrollingVoice}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition"
+              >
+                {submittingEnroll ? 'Locking Permanently...' : '2. Lock Lifetime Voice Permanently'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!voiceEnrollState.loading && !voiceEnrollState.isEnrolled && !voiceEnrollState.canEnroll && (
+          <div className="mx-6 mt-6 p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300">
+            Lifetime voice was not registered within the 10-minute boot window. Use Offline Hardware Recovery below or restart the server to enroll.
+          </div>
+        )}
 
         {/* 4-Layer Verification Grid */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -480,7 +674,9 @@ const SuperVerify = ({ onVerifySuccess }) => {
                 {renderStatusBadge(layers.liveVoice)}
               </div>
               <p className="text-xs text-slate-400 mb-4">
-                Speak passphrase clearly for 5 seconds. Pre-recorded audio is automatically rejected by liveness detection.
+                {voiceEnrollState.isEnrolled
+                  ? 'Speak passphrase clearly for 5 seconds. Matches against your locked lifetime master voice.'
+                  : 'Complete the 10-minute lifetime voice registration above before verifying Layer 3.'}
               </p>
             </div>
 
@@ -498,7 +694,7 @@ const SuperVerify = ({ onVerifySuccess }) => {
               <button
                 type="button"
                 onClick={handleRecordVoice}
-                disabled={isRecordingVoice || loading.voice || layers.liveVoice}
+                disabled={isRecordingVoice || loading.voice || layers.liveVoice || !voiceEnrollState.isEnrolled}
                 className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-500 text-xs font-bold uppercase tracking-wider rounded-lg transition"
               >
                 {layers.liveVoice
@@ -507,6 +703,8 @@ const SuperVerify = ({ onVerifySuccess }) => {
                   ? 'Analyzing Voice Liveness...'
                   : isRecordingVoice
                   ? `Recording (${voiceCountdown}s)...`
+                  : !voiceEnrollState.isEnrolled
+                  ? 'Register Lifetime Voice First'
                   : 'Start 5-Second Live Voice Recording'}
               </button>
             </div>
