@@ -55,7 +55,6 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 const SuperVerify = lazy(() => import('./pages/Admin/SuperVerify'));
 const SuperAdminDashboard = lazy(() => import('./pages/Admin/SuperAdminDashboard'));
-const HidePanel = lazy(() => import('./pages/Admin/HidePanel'));
 
 const getStoredSuperToken = () => {
   try {
@@ -135,7 +134,6 @@ const ProtectedRoute = ({ children, featureKey }) => {
   return <ComponentErrorBoundary>{children}</ComponentErrorBoundary>;
 };
 const SuperAdminStealthGate = () => {
-  const location = useLocation();
   const [superToken, setSuperToken] = useState(getStoredSuperToken);
 
   const handleUnlockSuccess = (token) => {
@@ -155,18 +153,6 @@ const SuperAdminStealthGate = () => {
           onVerifySuccess={handleUnlockSuccess}
           onUnlockSuccess={handleUnlockSuccess}
         />
-      </ComponentErrorBoundary>
-    );
-  }
-
-  const subPath = location.pathname.toLowerCase();
-
-  if (subPath === '/x9-super-2026/hide-control') {
-    return (
-      <ComponentErrorBoundary>
-        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
-          <HidePanel />
-        </div>
       </ComponentErrorBoundary>
     );
   }
