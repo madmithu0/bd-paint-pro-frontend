@@ -12,6 +12,12 @@ const SuperAdminDashboard = () => {
 
   // System & Stealth Control Room Telemetry State
   const [loading, setLoading] = useState(true);
+  const [voiceLockStatus, setVoiceLockStatus] = useState({
+    isEnrolled: false,
+    canEnroll: false,
+    remainingSeconds: 0,
+  });
+
   const [telemetry, setTelemetry] = useState({
     appVersion: 'v3.0.0 SELF-HEALING LOCK',
     platformShare15: 0,
@@ -29,11 +35,6 @@ const SuperAdminDashboard = () => {
     },
   });
 
-  // Stealth Hide Control & 5-Minute Countdown Timer State
-  const [isHidden, setIsHidden] = useState(true);
-  const [hideSecondsLeft, setHideSecondsLeft] = useState(300);
-  const [togglingHide, setTogglingHide] = useState(false);
-
   // Verify 4-Layer Session Token & Fetch Live Control Room Status
   const fetchDashboardStatus = useCallback(async () => {
     const token = localStorage.getItem('super_admin_4layer_token');
@@ -43,17 +44,23 @@ const SuperAdminDashboard = () => {
     }
 
     try {
-      const res = await api.get('/x9-super-2026/dashboard-status', {
-        headers: { 'x-super-token': token },
-      });
+      const [dashRes, voiceRes] = await Promise.all([
+        api.get('/x9-super-2026/dashboard-status', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'x-super-token': token,
+          },
+        }),
+        api.get('/x9-super-2026/voice-status').catch(() => ({ data: {} })),
+      ]);
 
-      if (res.data?.success) {
-        const data = res.data.data;
+      if (dashRes.data?.success) {
+        const data = dashRes.data.data || dashRes.data;
         const lv = data.layersVerified || {};
         const allFourGreen =
           lv.phoneOtp && lv.gmailOtp && lv.liveVoice && lv.liveFace3D;
 
-        if (!allFourGreen && !data.hardwareRecoveryActive) {
+        if (data.layersVerified && !allFourGreen && !data.hardwareRecoveryActive) {
           localStorage.removeItem('super_admin_4layer_token');
           showToast('Security Lock Triggered: 4-Layer verification incomplete', 'error');
           navigate('/x9-super-2026');
@@ -64,10 +71,14 @@ const SuperAdminDashboard = () => {
           ...prev,
           ...data,
         }));
-        setIsHidden(Boolean(data.isHidden));
-        if (typeof data.hideSecondsLeft === 'number') {
-          setHideSecondsLeft(data.hideSecondsLeft);
-        }
+      }
+
+      if (voiceRes.data?.success) {
+        setVoiceLockStatus({
+          isEnrolled: Boolean(voiceRes.data.isEnrolled),
+          canEnroll: Boolean(voiceRes.data.canEnroll),
+          remainingSeconds: Number(voiceRes.data.remainingSeconds || 0),
+        });
       }
     } catch (err) {
       if (err.response?.status === 401 || err.response?.status === 403) {
@@ -87,64 +98,11 @@ const SuperAdminDashboard = () => {
     return () => clearInterval(pollInterval);
   }, [fetchDashboardStatus]);
 
-  // 5-Minute Auto-Hide Live Countdown Timer
-  useEffect(() => {
-    if (isHidden || hideSecondsLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setHideSecondsLeft((prev) => {
-        if (prev <= 1) {
-          setIsHidden(true);
-          showToast('5-Minute Timer Expired: Stealth Hide Auto-Activated', 'warning');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isHidden, hideSecondsLeft, showToast]);
-
-  // Toggle Stealth Hide ON / OFF
-  const handleToggleHide = async () => {
-    const token = localStorage.getItem('super_admin_4layer_token');
-    setTogglingHide(true);
-    try {
-      const nextState = !isHidden;
-      const res = await api.post(
-        '/x9-super-2026/toggle-hide',
-        { hide: nextState },
-        { headers: { 'x-super-token': token } }
-      );
-
-      if (res.data?.success) {
-        setIsHidden(nextState);
-        setHideSecondsLeft(nextState ? 0 : 300);
-        showToast(
-          nextState
-            ? 'Stealth Hide Activated (Route Cloaked)'
-            : 'Stealth Hide Deactivated (5-Minute Timer Started)',
-          'success'
-        );
-      }
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to update Hide state', 'error');
-    } finally {
-      setTogglingHide(false);
-    }
-  };
-
   // Emergency Session Lock & Exit
   const handleLockSession = () => {
     localStorage.removeItem('super_admin_4layer_token');
     showToast('Control Room Locked & Session Purged', 'info');
     navigate('/x9-super-2026');
-  };
-
-  const formatCountdown = (totalSeconds) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
   // Integrated Sidebar Navigation Items (Merged File 146 -> 147)
   const adminModules = [
@@ -161,7 +119,7 @@ const SuperAdminDashboard = () => {
     { id: 'audit', label: 'System Audit Logs', path: '/x9-super-2026/audit' },
     { id: 'reports', label: 'Executive Reports', path: '/x9-super-2026/reports' },
     { id: 'notify', label: 'Broadcast Notifications', path: '/x9-super-2026/notifications' },
-    { id: 'hide', label: 'Stealth Hide Control', path: '/x9-super-2026/hide-control' },
+    { id: 'hide', label: 'Stealth & Biometric Status', path: '/x9-super-2026/hide-control' },
   ];
 
   const handleModuleNavigation = (mod) => {
@@ -182,7 +140,7 @@ const SuperAdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row select-none">
-      
+
       {/* INTEGRATED ADMIN SIDEBAR (Merged from File 146) */}
       <aside className="w-full lg:w-64 bg-slate-900/95 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col justify-between">
         <div>
@@ -230,10 +188,9 @@ const SuperAdminDashboard = () => {
           </button>
         </div>
       </aside>
-
       {/* MAIN CONTROL ROOM WORKSPACE */}
       <main className="flex-1 p-5 md:p-8 overflow-y-auto space-y-6">
-        
+
         {/* Top Telemetry & 4-Layer Green Verification Strip */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
@@ -241,7 +198,7 @@ const SuperAdminDashboard = () => {
               Super Admin Command Center
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Isolated Backdoor Session • Zero Public Frontend References • IP Whitelist Active
+              Isolated Backdoor Session • Zero Public Frontend References • IP Whitelist Active • Auto-Hide OFF
             </p>
           </div>
 
@@ -267,9 +224,10 @@ const SuperAdminDashboard = () => {
             ))}
           </div>
         </div>
+
         {/* Core Metrics & Telemetry Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          
+
           {/* Card 1: Total Platform Share (15% / 20%) */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-2">
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
@@ -297,7 +255,6 @@ const SuperAdminDashboard = () => {
               <span className="text-emerald-400 font-mono">{telemetry.lastPitrTimestamp}</span>
             </div>
           </div>
-
           {/* Card 3: Self-Healing Health Status */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-2">
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
@@ -328,53 +285,42 @@ const SuperAdminDashboard = () => {
           </div>
         </div>
 
-        {/* Stealth Hide / Unhide Control & 5-Minute Countdown Timer */}
+        {/* Lifetime Voice Lock & Stealth Policy Status Banner (5-Minute Auto-Hide Removed) */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <h2 className="text-base font-bold text-white">
-                Stealth Auto-Hide Cloaking System
+                Stealth Access & Lifetime Voice Biometric Lock
               </h2>
+              <span className="px-2.5 py-0.5 text-[11px] font-mono font-bold rounded border bg-slate-950 text-slate-300 border-slate-700">
+                AUTO-HIDE: PERMANENTLY OFF
+              </span>
               <span
                 className={`px-2.5 py-0.5 text-[11px] font-mono font-bold rounded border ${
-                  isHidden
+                  voiceLockStatus.isEnrolled
                     ? 'bg-emerald-950 text-emerald-400 border-emerald-500/40'
                     : 'bg-amber-950 text-amber-400 border-amber-500/40'
                 }`}
               >
-                {isHidden ? 'HIDE: ON (CLOAKED)' : 'HIDE: OFF (VISIBLE)'}
+                {voiceLockStatus.isEnrolled
+                  ? 'LIFETIME VOICE: LOCKED'
+                  : voiceLockStatus.canEnroll
+                  ? `ENROLLMENT WINDOW: ${voiceLockStatus.remainingSeconds}s LEFT`
+                  : 'ENROLLMENT WINDOW: CLOSED'}
               </span>
             </div>
             <p className="text-xs text-slate-400 max-w-2xl">
-              Automatically conceals administrative endpoints after 5 minutes of server start or manual unhide. Only whitelisted Super Admin IP + Token can view hidden state.
+              The 5-minute auto-hide timer is disabled. Control room security is enforced permanently via IP Whitelist, Secret Route (/x9-super-2026), and 4-Layer Biometric verification using your locked lifetime voice signature.
             </p>
           </div>
 
-          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <div className="text-right">
-              <div className="text-[10px] font-mono uppercase text-slate-500">
-                Auto-Hide Countdown
-              </div>
-              <div className="text-xl font-bold font-mono text-amber-400">
-                {isHidden ? '00:00' : formatCountdown(hideSecondsLeft)}
-              </div>
-            </div>
-
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end bg-slate-950 p-4 rounded-xl border border-slate-800">
             <button
               type="button"
-              onClick={handleToggleHide}
-              disabled={togglingHide}
-              className={`px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
-                isHidden
-                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-              } disabled:opacity-50`}
+              onClick={() => navigate('/x9-super-2026/hide-control')}
+              className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white transition"
             >
-              {togglingHide
-                ? 'Updating...'
-                : isHidden
-                ? 'Unhide (5m Window)'
-                : 'Activate Hide Now'}
+              View Biometric Lock Details
             </button>
           </div>
         </div>
