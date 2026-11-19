@@ -52,11 +52,18 @@ const SchedulePage = lazy(() => import('./pages/SchedulePage'));
 const ContractPage = lazy(() => import('./pages/Legal/ContractPage'));
 const LegalPages = lazy(() => import('./pages/Legal/LegalPages'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+
 const SuperVerify = lazy(() => import('./pages/Admin/SuperVerify'));
 const SuperAdminDashboard = lazy(() => import('./pages/Admin/SuperAdminDashboard'));
+const HidePanel = lazy(() => import('./pages/Admin/HidePanel'));
+
 const getStoredSuperToken = () => {
   try {
-    return localStorage.getItem('superAdminToken') || '';
+    return (
+      localStorage.getItem('super_admin_4layer_token') ||
+      localStorage.getItem('superAdminToken') ||
+      ''
+    );
   } catch {
     return '';
   }
@@ -65,8 +72,10 @@ const getStoredSuperToken = () => {
 const setStoredSuperToken = (token) => {
   try {
     if (token) {
+      localStorage.setItem('super_admin_4layer_token', token);
       localStorage.setItem('superAdminToken', token);
     } else {
+      localStorage.removeItem('super_admin_4layer_token');
       localStorage.removeItem('superAdminToken');
     }
   } catch {}
@@ -106,13 +115,13 @@ class ComponentErrorBoundary extends Component {
 
 const ProtectedRoute = ({ children, featureKey }) => {
   const { isAuthenticated, user } = useAuth();
-  const { isKilled, isHidden } = useKill(featureKey);
+  const { isKilled } = useKill(featureKey);
 
   if (!isAuthenticated || !user || user.role === 'SuperAdmin') {
     return <Navigate to="/login" replace />;
   }
 
-  if (isHidden || isKilled) {
+  if (isKilled) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="p-6 bg-amber-50 border border-amber-300 rounded-lg text-amber-800 text-center">
@@ -125,8 +134,8 @@ const ProtectedRoute = ({ children, featureKey }) => {
 
   return <ComponentErrorBoundary>{children}</ComponentErrorBoundary>;
 };
-
 const SuperAdminStealthGate = () => {
+  const location = useLocation();
   const [superToken, setSuperToken] = useState(getStoredSuperToken);
 
   const handleUnlockSuccess = (token) => {
@@ -142,17 +151,36 @@ const SuperAdminStealthGate = () => {
   if (!superToken) {
     return (
       <ComponentErrorBoundary>
-        <SuperVerify onUnlockSuccess={handleUnlockSuccess} />
+        <SuperVerify
+          onVerifySuccess={handleUnlockSuccess}
+          onUnlockSuccess={handleUnlockSuccess}
+        />
+      </ComponentErrorBoundary>
+    );
+  }
+
+  const subPath = location.pathname.toLowerCase();
+
+  if (subPath === '/x9-super-2026/hide-control') {
+    return (
+      <ComponentErrorBoundary>
+        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
+          <HidePanel />
+        </div>
       </ComponentErrorBoundary>
     );
   }
 
   return (
     <ComponentErrorBoundary>
-      <SuperAdminDashboard superToken={superToken} onLogout={handleSuperLogout} />
+      <SuperAdminDashboard
+        superToken={superToken}
+        onLogout={handleSuperLogout}
+      />
     </ComponentErrorBoundary>
   );
 };
+
 const AppLayout = () => {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
