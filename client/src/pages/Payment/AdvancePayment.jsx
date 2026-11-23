@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, CreditCard, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CreditCard, ShieldCheck, Lock, Unlock } from 'lucide-react';
 import useToast from '../../hooks/useToast';
 import api from '../../api';
 import { formatTaka } from '../../format';
 import Card from '../../components/Card';
 import Loading from '../../components/Loading';
+import HotlineWidget from '../../components/HotlineWidget';
 
 export default function AdvancePayment() {
   const { jobId } = useParams();
@@ -47,7 +48,9 @@ export default function AdvancePayment() {
 
   const totalAmount = Number(job.price) || 0;
   const alreadyPaid = Number(job.paidAmount) || 0;
-  const isAdvancePaid = alreadyPaid > 0 && alreadyPaid < totalAmount;
+  const isAdvancePaid =
+    Boolean(job.milestoneStages?.stage1Paid) ||
+    (alreadyPaid > 0 && alreadyPaid < totalAmount);
 
   const payableAmount = isAdvancePaid
     ? Math.max(totalAmount - alreadyPaid, 0)
@@ -75,7 +78,7 @@ export default function AdvancePayment() {
       success(
         isAdvancePaid
           ? 'Remaining balance paid and locked in Escrow.'
-          : `${percentage}% Advance payment verified.`
+          : `${percentage}% Advance verified. Mistri phone number and chatbox are now unlocked!`
       );
       navigate(`/payment/status/${data?.payment?._id || job._id}`, { replace: true });
     } catch (err) {
@@ -102,6 +105,25 @@ export default function AdvancePayment() {
             Flexible 30% or 50% advance escrow lock for {job.sqft} Sqft job
           </p>
         </div>
+      </div>
+      <HotlineWidget
+        compact={true}
+        contextMessage={`Hello, I am paying ${percentage}% advance for Job ID ${job._id} (${job.sqft} Sqft).`}
+      />
+
+      <div
+        className={`p-3.5 rounded-xl border flex items-center gap-3 text-xs font-medium ${
+          isAdvancePaid
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
+            : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300'
+        }`}
+      >
+        {isAdvancePaid ? <Unlock size={18} className="shrink-0" /> : <Lock size={18} className="shrink-0" />}
+        <span>
+          {isAdvancePaid
+            ? '30% Advance Verified: Mistri phone number and live chatbox are now unlocked.'
+            : 'Security Lock: Mistri phone number and live chatbox automatically unlock immediately after 30% advance payment.'}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
