@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, User, ShieldCheck, Save } from 'lucide-react';
+import { ShieldCheck, Save } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import useToast from '../../hooks/useToast';
 import api from '../../api';
 import Card from '../../components/Card';
+import AvatarUploader from '../../components/AvatarUploader';
+import MistriSkillSelector from '../../components/MistriSkillSelector';
 
 export default function ProfilePage() {
   const { user, role, isVerified, updateUser } = useAuth();
@@ -12,16 +14,7 @@ export default function ProfilePage() {
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(user?.avatar || '');
   const [saving, setSaving] = useState(false);
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
-  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -36,21 +29,15 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
-      const formData = new FormData();
-      formData.append('name', name.trim());
-      formData.append('phone', phone.trim());
-      if (avatarFile) {
-        formData.append('avatar', avatarFile);
-      }
-
-      const { data } = await api.put('/users/profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const { data } = await api.put('/users/profile', {
+        name: name.trim(),
+        phone: phone.trim(),
       });
 
       if (data?.user) {
         updateUser(data.user);
       } else {
-        updateUser({ name: name.trim(), phone: phone.trim(), avatar: avatarPreview });
+        updateUser({ name: name.trim(), phone: phone.trim() });
       }
       success('Profile updated successfully.');
     } catch (err) {
@@ -81,32 +68,19 @@ export default function ProfilePage() {
         )}
       </div>
 
+      <AvatarUploader
+        currentPhoto={user?.profilePhoto || user?.avatar || ''}
+        userName={user?.name || 'User'}
+        onUploadSuccess={(uploadedUrl) =>
+          updateUser({ profilePhoto: uploadedUrl, avatar: uploadedUrl })
+        }
+        onResetSuccess={() =>
+          updateUser({ profilePhoto: '', avatar: '' })
+        }
+      />
+
       <Card>
         <form onSubmit={handleSaveProfile} className="space-y-5">
-          <div className="flex items-center gap-4">
-            <div className="relative w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center overflow-hidden border border-gray-200 dark:border-slate-700">
-              {avatarPreview ? (
-                <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User size={32} />
-              )}
-            </div>
-
-            <div>
-              <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer">
-                <Camera size={15} />
-                <span>Change Photo</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
-              </label>
-              <p className="text-[11px] text-gray-500 mt-1">JPG, PNG or WebP (Auto-sanitized)</p>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Full Name</label>
@@ -118,7 +92,6 @@ export default function ProfilePage() {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium mb-1">Phone Number</label>
               <input
@@ -147,6 +120,15 @@ export default function ProfilePage() {
           </button>
         </form>
       </Card>
+
+      {role === 'Mistri' && (
+        <MistriSkillSelector
+          initialSelectedIds={user?.capableServices || []}
+          onSaveSuccess={(updatedIds) =>
+            updateUser({ capableServices: updatedIds })
+          }
+        />
+      )}
     </div>
   );
 }
