@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, Wallet, Users, PlusCircle, ArrowUpRight } from 'lucide-react';
+import { Briefcase, Wallet, Users, PlusCircle, ArrowUpRight, CheckCircle2, Clock } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import useToast from '../hooks/useToast';
 import api from '../api';
@@ -11,7 +11,12 @@ import Loading from '../components/Loading';
 
 export default function Dashboard() {
   const { user, role } = useAuth();
-  const { error } = useToast();
+  const { error, success } = useToast();
+
+  const [isAvailable, setIsAvailable] = useState(
+    typeof user?.isAvailable === 'boolean' ? user.isAvailable : true
+  );
+  const [togglingStatus, setTogglingStatus] = useState(false);
 
   const [stats, setStats] = useState({
     totalJobs: 0,
@@ -21,6 +26,12 @@ export default function Dashboard() {
     monthlyChart: [],
   });
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (typeof user?.isAvailable === 'boolean') {
+      setIsAvailable(user.isAvailable);
+    }
+  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -62,6 +73,30 @@ export default function Dashboard() {
     };
   }, [role, error]);
 
+  const handleToggleAvailability = async () => {
+    if (togglingStatus) return;
+    const nextStatus = !isAvailable;
+    try {
+      setTogglingStatus(true);
+      const res = await api.patch('/users/availability', {
+        isAvailable: nextStatus,
+      });
+      if (res.data?.success) {
+        setIsAvailable(res.data.isAvailable);
+        if (success) {
+          success(
+            res.data.isAvailable
+              ? 'Status updated: You are now Available for new jobs.'
+              : 'Status updated: Marked as Busy.'
+          );
+        }
+      }
+    } catch (err) {
+      error(err.response?.data?.message || 'Failed to update availability status.');
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
   if (loading) {
     return <Loading variant="skeleton" />;
   }
@@ -77,6 +112,28 @@ export default function Dashboard() {
             Account Role: <span className="font-semibold text-blue-600">{role}</span>
           </p>
         </div>
+
+        {role === 'Mistri' && (
+          <button
+            type="button"
+            disabled={togglingStatus}
+            onClick={handleToggleAvailability}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition self-start ${
+              isAvailable
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'bg-amber-600 hover:bg-amber-700 text-white'
+            } disabled:opacity-50`}
+          >
+            {isAvailable ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+            <span>
+              {togglingStatus
+                ? 'Updating...'
+                : isAvailable
+                ? 'Status: Available (Free)'
+                : 'Status: Busy (Working)'}
+            </span>
+          </button>
+        )}
 
         {(role === 'Customer' || role === 'Agent') && (
           <Link
@@ -149,28 +206,42 @@ export default function Dashboard() {
             </p>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-slate-800">
-              {stats.recentJobs.map((job) => (
-                <Link
-                  key={job._id}
-                  to={`/jobs/${job._id}`}
-                  className="py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/40 px-2 rounded-lg transition"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {job.sqft} Sqft • {job.isMistriOnly ? 'Mistri-Only' : 'With Material'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-slate-400">
-                      {formatDate(job.createdAt)} • {job.totalDays} Days
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-blue-600">{formatTaka(job.price)}</p>
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 font-medium">
-                      {job.status}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+              {stats.recentJobs.map((job) => {
+                const advancePaid = Boolean(job.milestoneStages?.stage1Paid);
+                return (
+                  <Link
+                    key={job._id}
+                    to={`/jobs/${job._id}`}
+                    className="py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/40 px-2 rounded-lg transition"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {job.sqft} Sqft • {job.isMistriOnly ? 'Mistri-Only' : 'With Material'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                        {formatDate(job.createdAt)} • {job.totalDays} Days
+                      </p>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <p className="text-sm font-bold text-blue-600">{formatTaka(job.price)}</p>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                            advancePaid
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {advancePaid ? '30% Paid' : '30% Due'}
+                        </span>
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 font-medium">
+                          {job.status}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </Card>
