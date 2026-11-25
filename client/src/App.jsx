@@ -11,6 +11,9 @@ import Toast from './components/Toast';
 
 const APP_VERSION = 'v3.8.0 LOCK';
 
+const MerchantOrderCheckout = lazy(() => import('./pages/MerchantOrderCheckout'));
+const WarrantyVerifyPage = lazy(() => import('./pages/Legal/WarrantyVerifyPage'));
+
 const HomePage = lazy(() => import('./pages/HomePage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Login = lazy(() => import('./pages/Auth/Login'));
@@ -234,7 +237,10 @@ const AppLayout = () => {
               <Route path="/withdraw" element={<ProtectedRoute featureKey="withdraw"><WithdrawPage /></ProtectedRoute>} />
               <Route path="/advance-payment" element={<ProtectedRoute featureKey="advancePayment"><AdvancePayment /></ProtectedRoute>} />
               <Route path="/coupon" element={<ProtectedRoute featureKey="coupon"><CouponApply /></ProtectedRoute>} />
-              <Route path="/wallet" element={<ProtectedRoute featureKey="wallet"><WalletPage /></ProtectedRoute>} />
+
+           <Route path="/warranty-verify" element={<WarrantyVerifyPage />} />
+<Route path="/store/checkout" element={<ProtectedRoute featureKey="material"><MerchantOrderCheckout /></ProtectedRoute>} />
+             <Route path="/wallet" element={<ProtectedRoute featureKey="wallet"><WalletPage /></ProtectedRoute>} />
               <Route path="/chat" element={<ProtectedRoute featureKey="chat"><ChatList /></ProtectedRoute>} />
               <Route path="/chat/:id" element={<ProtectedRoute featureKey="chat"><ChatPage /></ProtectedRoute>} />
               <Route path="/attendance" element={<ProtectedRoute featureKey="attendance"><AttendanceList /></ProtectedRoute>} />
