@@ -9,7 +9,7 @@ import Footer from './components/Footer';
 import Loading from './components/Loading';
 import Toast from './components/Toast';
 
-const APP_VERSION = 'v3.0.0 LOCK';
+const APP_VERSION = 'v3.8.0 LOCK';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -53,13 +53,14 @@ const ContractPage = lazy(() => import('./pages/Legal/ContractPage'));
 const LegalPages = lazy(() => import('./pages/Legal/LegalPages'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
-const SuperVerify = lazy(() => import('./pages/Admin/SuperVerify'));
+// v3.8.0: SuperVerify replaced by Password + 2FA SuperAdminLogin
+const SuperAdminLogin = lazy(() => import('./pages/Admin/SuperAdminLogin'));
 const SuperAdminDashboard = lazy(() => import('./pages/Admin/SuperAdminDashboard'));
 
 const getStoredSuperToken = () => {
   try {
     return (
-      localStorage.getItem('super_admin_4layer_token') ||
+      localStorage.getItem('super_admin_2fa_token') ||
       localStorage.getItem('superAdminToken') ||
       ''
     );
@@ -71,15 +72,14 @@ const getStoredSuperToken = () => {
 const setStoredSuperToken = (token) => {
   try {
     if (token) {
-      localStorage.setItem('super_admin_4layer_token', token);
+      localStorage.setItem('super_admin_2fa_token', token);
       localStorage.setItem('superAdminToken', token);
     } else {
-      localStorage.removeItem('super_admin_4layer_token');
+      localStorage.removeItem('super_admin_2fa_token');
       localStorage.removeItem('superAdminToken');
     }
   } catch {}
 };
-
 class ComponentErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -120,6 +120,7 @@ const ProtectedRoute = ({ children, featureKey }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // v3.8.0 Modular Per-Feature Failsafe Check
   if (isKilled) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -133,10 +134,11 @@ const ProtectedRoute = ({ children, featureKey }) => {
 
   return <ComponentErrorBoundary>{children}</ComponentErrorBoundary>;
 };
+
 const SuperAdminStealthGate = () => {
   const [superToken, setSuperToken] = useState(getStoredSuperToken);
 
-  const handleUnlockSuccess = (token) => {
+  const handleLoginSuccess = (token) => {
     setStoredSuperToken(token);
     setSuperToken(token);
   };
@@ -149,9 +151,9 @@ const SuperAdminStealthGate = () => {
   if (!superToken) {
     return (
       <ComponentErrorBoundary>
-        <SuperVerify
-          onVerifySuccess={handleUnlockSuccess}
-          onUnlockSuccess={handleUnlockSuccess}
+        <SuperAdminLogin
+          onLoginSuccess={handleLoginSuccess}
+          onVerifySuccess={handleLoginSuccess}
         />
       </ComponentErrorBoundary>
     );
@@ -162,15 +164,14 @@ const SuperAdminStealthGate = () => {
       <SuperAdminDashboard
         superToken={superToken}
         onLogout={handleSuperLogout}
+        appVersion={APP_VERSION}
       />
     </ComponentErrorBoundary>
   );
 };
-
 const AppLayout = () => {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
-  const { globalKill } = useKill();
 
   const normalizedPath = location.pathname.toLowerCase();
   const isStealthRoute =
@@ -179,7 +180,7 @@ const AppLayout = () => {
 
   if (isStealthRoute) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="min-h-screen bg-slate-950 text-slate-100" data-version={APP_VERSION}>
         <Toast />
         <Suspense fallback={<Loading fullScreen={true} />}>
           <Routes>
@@ -192,19 +193,11 @@ const AppLayout = () => {
     );
   }
 
-  if (globalKill) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6 text-center">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">System Temporarily Offline</h1>
-          <p className="text-slate-400 text-sm">Version {APP_VERSION} • Scheduled Maintenance Active</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100">
+    <div
+      className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-gray-100"
+      data-version={APP_VERSION}
+    >
       <Toast />
       {isAuthenticated ? <Topbar /> : <Navbar />}
       <div className="flex flex-1">
