@@ -51,24 +51,18 @@ export default function OfflineBanner() {
   return (
     <div
       className={`w-full px-4 py-2 text-xs font-medium text-center transition-colors z-50 ${
-        !isOnline
-          ? 'bg-amber-600 text-white'
-          : 'bg-emerald-600 text-white'
+        !isOnline ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white'
       }`}
     >
       {!isOnline ? (
         <span>
-          আপনি এখন অফলাইনে আছেন — আপনার তথ্য লোকাল ড্রাফটে সংরক্ষিত হচ্ছে এবং ইন্টারনেট এলে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে
-          {pendingCount > 0 ? ` (${pendingCount}টি অপেক্ষমাণ)` : ''}।
+          Offline Mode Active — Changes are saved locally and will sync automatically once connected
+          {pendingCount > 0 ? ` (${pendingCount} queued)` : ''}.
         </span>
       ) : justReconnected ? (
-        <span>
-          ইন্টারনেট সংযোগ ফিরে এসেছে! অপেক্ষমাণ তথ্য সার্ভারের সাথে সিঙ্ক হচ্ছে...
-        </span>
+        <span>Connection restored. Syncing queued offline data...</span>
       ) : (
-        <span>
-          অফলাইন কিউতে {pendingCount}টি তথ্য সিঙ্ক হওয়ার অপেক্ষায় আছে...
-        </span>
+        <span>Syncing {pendingCount} queued item(s)...</span>
       )}
     </div>
   );
