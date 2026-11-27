@@ -1,22 +1,50 @@
-import { useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import api from '../api';
 
 export default function useKill(featureKey = null) {
-  const { killState, setKillState } = useStore();
+  const store = useStore ? useStore() : {};
+  const { killState, setKillState } = store;
+
+  const [localState, setLocalState] = useState({
+    features: {},
+    govtFeatureFlags: {
+      autoVatEnabled: false,
+      nbrBinMandateEnabled: false,
+      govtAuditEnabled: false,
+    },
+    hotlineConfig: {
+      number: '',
+      isLive: false,
+    },
+    isHidden: false,
+  });
 
   const syncKillStatus = useCallback(async () => {
     try {
-      const { data } = await api.get('/kill/status');
+      const { data } = await api.get('/kill/public-status');
       if (data && typeof data === 'object') {
-        setKillState({
-          globalKill: Boolean(data.globalKill),
-          features: data.features || {},
+        const nextState = {
+          features: data.featureSwitches || data.features || {},
+          govtFeatureFlags: {
+            autoVatEnabled: Boolean(data.govtFeatureFlags?.autoVatEnabled),
+            nbrBinMandateEnabled: Boolean(data.govtFeatureFlags?.nbrBinMandateEnabled),
+            govtAuditEnabled: Boolean(data.govtFeatureFlags?.govtAuditEnabled),
+          },
+          hotlineConfig: {
+            number: data.hotlineConfig?.number || '',
+            isLive: Boolean(data.hotlineConfig?.isLive),
+          },
           isHidden: Boolean(data.isHidden),
-        });
+        };
+
+        setLocalState(nextState);
+        if (typeof setKillState === 'function') {
+          setKillState(nextState);
+        }
       }
     } catch {
-      // Fail silently to preserve existing state on transient network glitch
+      // Preserve existing state on transient network glitch
     }
   }, [setKillState]);
 
@@ -24,12 +52,19 @@ export default function useKill(featureKey = null) {
     syncKillStatus();
   }, [syncKillStatus]);
 
-  const isKilled = featureKey ? Boolean(killState.features?.[featureKey]) : false;
+  const activeFeatures = killState?.features || localState.features;
+  const activeGovtFlags = killState?.govtFeatureFlags || localState.govtFeatureFlags;
+  const activeHotline = killState?.hotlineConfig || localState.hotlineConfig;
+  const normalizedKey = featureKey ? String(featureKey).toUpperCase() : null;
+
+  const isKilled = normalizedKey ? Boolean(activeFeatures?.[normalizedKey]) : false;
 
   return {
-    globalKill: Boolean(killState.globalKill),
-    isHidden: Boolean(killState.isHidden),
+    isHidden: Boolean(killState?.isHidden ?? localState.isHidden),
     isKilled,
+    featureSwitches: activeFeatures,
+    govtFeatureFlags: activeGovtFlags,
+    hotlineConfig: activeHotline,
     refreshKillStatus: syncKillStatus,
   };
 }
