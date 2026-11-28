@@ -109,3 +109,5 @@ export const useStore = () => {
   }
   return context;
 };
+
+export default useStore;
