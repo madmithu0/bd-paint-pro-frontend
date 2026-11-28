@@ -17,6 +17,10 @@ export default function useKill(featureKey = null) {
       number: '',
       isLive: false,
     },
+    mistriSignupControl: {
+      newMistriSignupEnabled: true,
+      maxMistriPerUpazila: 0,
+    },
     isHidden: false,
   });
 
@@ -34,6 +38,13 @@ export default function useKill(featureKey = null) {
           hotlineConfig: {
             number: data.hotlineConfig?.number || '',
             isLive: Boolean(data.hotlineConfig?.isLive),
+          },
+          mistriSignupControl: {
+            newMistriSignupEnabled:
+              data.mistriSignupControl?.newMistriSignupEnabled !== undefined
+                ? Boolean(data.mistriSignupControl.newMistriSignupEnabled)
+                : true,
+            maxMistriPerUpazila: Number(data.mistriSignupControl?.maxMistriPerUpazila) || 0,
           },
           isHidden: Boolean(data.isHidden),
         };
@@ -55,6 +66,7 @@ export default function useKill(featureKey = null) {
   const activeFeatures = killState?.features || localState.features;
   const activeGovtFlags = killState?.govtFeatureFlags || localState.govtFeatureFlags;
   const activeHotline = killState?.hotlineConfig || localState.hotlineConfig;
+  const activeMistriControl = killState?.mistriSignupControl || localState.mistriSignupControl;
   const normalizedKey = featureKey ? String(featureKey).toUpperCase() : null;
 
   const isKilled = normalizedKey ? Boolean(activeFeatures?.[normalizedKey]) : false;
@@ -65,6 +77,9 @@ export default function useKill(featureKey = null) {
     featureSwitches: activeFeatures,
     govtFeatureFlags: activeGovtFlags,
     hotlineConfig: activeHotline,
+    mistriSignupControl: activeMistriControl,
+    newMistriSignupEnabled: Boolean(activeMistriControl?.newMistriSignupEnabled ?? true),
+    maxMistriPerUpazila: Number(activeMistriControl?.maxMistriPerUpazila) || 0,
     refreshKillStatus: syncKillStatus,
   };
 }
